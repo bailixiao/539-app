@@ -13,11 +13,14 @@ const GROUPS = {
   data: [["data","資料"]]
 };
 const NAV_KEY = "t539_nav";
+const ADMIN_KEY = "t539_admin";  // 管理者密碼只存在這支手機，按「登出」就清掉
 
 const S = {
   group: "tail", tab: "dist", last: {}, range: 100, draws: [], source: "loading", fetchedAt: 0,
-  randomPick: null, test: null, ev: null, evPer: 1
+  randomPick: null, test: null, ev: null, evPer: 1,
+  admin: "", csv: null, msg: "", msgErr: false, busy: false, refreshing: false
 };
+try{ S.admin = localStorage.getItem(ADMIN_KEY) || ""; }catch(e){}
 
 /* ---------- 資料存取 ---------- */
 function sortDraws(a){ return a.slice().sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0); }
@@ -34,7 +37,10 @@ function writeCache(draws, at){
 // 先顯示手機裡存的上一份資料，再向 Apps Script 拿最新的；拿不到就繼續用存的
 async function loadDraws(){
   const cached = readCache();
-  if(cached){ S.draws = cached.draws; S.fetchedAt = cached.at; S.source = "cache"; render(); }
+  if(cached){ S.draws = cached.draws; S.fetchedAt = cached.at; S.source = "checking"; render(); }
+  await fetchLatest();
+}
+async function fetchLatest(){
   try{
     const res = await fetch(API, {cache: "no-store"});
     if(!res.ok) throw new Error("HTTP " + res.status);
@@ -47,6 +53,31 @@ async function loadDraws(){
   }
   S.test = null; S.ev = null; render();
 }
+
+// 管理者動作：送到 Apps Script 的 doPost。用 text/plain 送，瀏覽器才不會多做一次跨網域檢查
+async function adminPost(body){
+  const res = await fetch(API, {method: "POST", headers: {"Content-Type": "text/plain;charset=utf-8"}, body: JSON.stringify(body)});
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+/* ---------- 開獎日與更新提醒（台灣時間） ---------- */
+const WEEK = ["日","一","二","三","四","五","六"];
+const twNow = () => new Date(Date.now() + 8*3600e3);  // 用 getUTC* 讀，就是台灣時間
+const ymd = d => d.toISOString().slice(0,10);
+// 最後一期之後，有幾個開獎日（週一到週六）已經過了晚上 10 點、卻還沒有資料
+function missedDraws(last){
+  const now = twNow(), today = ymd(now), d = new Date(last + "T00:00:00Z");
+  let n = 0;
+  for(let i=0; i<400; i++){
+    d.setUTCDate(d.getUTCDate()+1);
+    const s = ymd(d);
+    if(s > today || (s === today && now.getUTCHours() < 22)) break;
+    if(d.getUTCDay() !== 0) n++;
+  }
+  return n;
+}
+function dateLabel(s){ const d=new Date(s+"T00:00:00Z"); return `${d.getUTCMonth()+1}/${d.getUTCDate()}（${WEEK[d.getUTCDay()]}）`; }
 
 /* ---------- 畫面 ---------- */
 const $ = s => document.querySelector(s);
@@ -252,23 +283,87 @@ function viewEV(){
   return html;
 }
 
+function msgHTML(){ return S.msg ? `<p class="msg ${S.msgErr?"err":""}">${S.msg}</p>` : ""; }
+
+function viewLogin(){
+  return `<div class="panel"><h2>管理者登入</h2>
+    <p class="note">輸入管理密碼後，會多出「資料」分頁，可以匯入台彩官方 CSV、刪除錯誤的期數。一般使用者不需要登入。</p>
+    <form id="loginForm" class="btns" autocomplete="off">
+      <input type="password" id="pwIn" placeholder="管理密碼" autocomplete="current-password" style="flex:1;min-width:0">
+      <button class="btn" ${S.busy?"disabled":""}>${S.busy?"確認中…":"登入"}</button>
+    </form>${msgHTML()}</div>`;
+}
+
 function viewData(){
-  const L=S.draws;
-  const src={online:"已連線，是最新資料。", cache:"目前連不上網路，顯示的是上次存在這支手機裡的資料。", error:"讀不到資料。", loading:"讀取中…"}[S.source];
-  let html=`<div class="panel"><h2>資料狀態</h2>
-    <p class="note">${src}${L.length?`<br>共 ${L.length} 期，從 ${L[0].d} 到 ${L[L.length-1].d}。`:""}${S.fetchedAt?`<br>上次從雲端更新：${fmtTime(S.fetchedAt)}。`:""}</p></div>`;
-  html+=`<div class="panel"><h2>自動更新</h2><p class="note">每週一到週六晚上 9 點多，系統會自動抓兩個開獎網站，號碼一致才寫入；兩邊不一致時，以台灣彩券官方資料為準。不需要手動輸入。</p></div>`;
-  const last=L.slice(-10).reverse();
-  html+=`<div class="panel"><h2>最近 10 期</h2><div class="list">${last.length?last.map(x=>`<div class="it"><span>${x.d}</span><span class="ns">${x.n.map(pad2).join(" ")}</span></div>`).join(""):'<p class="note">還沒有資料。</p>'}</div></div>`;
+  if(!S.admin) return viewLogin();
+  const L=S.draws, last=L[L.length-1];
+  const src={online:"已連線，是最新資料。", checking:"正在向雲端讀取最新資料…", cache:"目前連不上網路，顯示的是上次存在這支手機裡的資料。", error:"讀不到資料。", loading:"讀取中…"}[S.source];
+  const miss=last?missedDraws(last.d):0;
+  let html=`<div class="panel"><h2>資料更新到哪天</h2>
+    <p class="note">${src}${last?`<br>最新一期：${dateLabel(last.d)}，共 ${L.length} 期（從 ${L[0].d} 開始）。`:""}${S.fetchedAt?`<br>上次從雲端讀取：${fmtTime(S.fetchedAt)}。`:""}</p>
+    ${last?`<div class="verdict ${miss>=2?"warn":""}">${miss>=2?`已經有 ${miss} 個開獎日沒有新資料，自動抓號可能壞了。請到 Apps Script 的「執行項目」看記錄，或截圖給 Claude。`:miss===1?"今天（或上一個開獎日）的號碼還沒寫入。每晚 9–10 點會自動抓，晚點再看。":"資料是最新的。"}</div>`:""}
+    <p class="note">每週一到週六晚上 9–10 點自動抓兩個開獎網站，號碼一致才寫入；不一致時以台彩官方為準。不提供手動輸入。</p></div>`;
+  const c=S.csv;
+  html+=`<div class="panel"><h2>匯入官方 CSV</h2>
+    <p class="note">到台灣彩券官網下載「今彩539_年份.csv」再選這個檔案。同一天的資料會以官方版本覆蓋，沒有的會新增。</p>
+    <div class="btns"><label class="btn ghost">選擇檔案<input type="file" id="fileIn" accept=".csv,text/csv" hidden></label></div>
+    ${c?`<p class="note">${c.name}：讀到 ${c.count} 期今彩539${c.count?`（${c.from} 到 ${c.to}）`:""}。</p>
+      ${c.count?`<div class="btns"><button class="btn" data-act="import" ${S.busy?"disabled":""}>${S.busy?"匯入中…":`匯入 ${c.count} 期`}</button></div>`:""}`:""}
+    ${msgHTML()}</div>`;
+  const recentList=L.slice(-20).reverse();
+  html+=`<div class="panel"><h2>最近資料</h2>
+    <p class="note">發現某一期號碼錯了，可以刪除；如果兩個開獎網站資料正確，當晚自動抓號會再補回來。</p>
+    <div class="list">${recentList.map(x=>`<div class="it"><span>${x.d}</span><span class="ns">${x.n.map(pad2).join(" ")}</span><button class="x" data-del="${x.d}" ${S.busy?"disabled":""}>刪除</button></div>`).join("")||'<p class="note">還沒有資料。</p>'}</div></div>`;
+  html+=`<div class="panel"><div class="btns" style="margin-top:0"><button class="btn ghost" data-act="logout">登出管理者</button></div>
+    <p class="note">登出後「資料」分頁會隱藏，要再輸入密碼才看得到。</p></div>`;
   return html;
+}
+
+// 讀 CSV 檔：先用 UTF-8，亂碼太多再試 Big5（沿用原版做法）；只先數期數給管理者確認
+function onFile(e){
+  const f=e.target.files[0]; if(!f) return;
+  f.arrayBuffer().then(buf=>{
+    let t=new TextDecoder("utf-8").decode(buf);
+    if((t.match(/�/g)||[]).length>5){ try{ t=new TextDecoder("big5").decode(buf); }catch(_){} }
+    const dates=[];
+    t.split(/\r?\n/).forEach(l=>{ const c=l.split(","); if(c[0]&&c[0].replace(/^﻿/,"").trim()==="今彩539"){ const m=(c[2]||"").match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/); if(m) dates.push(`${m[1]}-${pad2(m[2])}-${pad2(m[3])}`); } });
+    dates.sort();
+    S.csv={name:f.name, text:t, count:dates.length, from:dates[0], to:dates[dates.length-1]};
+    S.msg = dates.length ? "" : "這個檔案裡沒有今彩539的資料，請確認是台彩官網下載的「今彩539_年份.csv」。";
+    S.msgErr = !dates.length;
+    render();
+  });
+}
+
+async function runAdmin(body, okMsg){
+  S.busy=true; S.msg=""; render();
+  try{
+    const r=await adminPost({password:S.admin, ...body});
+    if(!r.ok && r.msg==="密碼錯誤"){ logout(); S.msg="密碼已經改過，請重新登入。"; S.msgErr=true; return false; }
+    S.msg=r.ok?(okMsg||r.msg):r.msg; S.msgErr=!r.ok;
+    if(r.ok) await fetchLatest();
+    return r.ok;
+  }catch(err){
+    S.msg="連不上伺服器："+err.message; S.msgErr=true; return false;
+  }finally{ S.busy=false; render(); }
+}
+function logout(){
+  S.admin=""; S.csv=null;
+  try{ localStorage.removeItem(ADMIN_KEY); }catch(e){}
 }
 
 function render(){
   const L=S.draws;
   if(!L.length) $("#meta").textContent = S.source==="loading" ? "讀取資料中…" : "讀不到開獎資料";
-  else $("#meta").innerHTML=`共 ${L.length} 期，最新 ${L[L.length-1].d}`+
-    (S.source==="cache"?`<span class="src off">離線資料（${fmtTime(S.fetchedAt)} 更新）</span>`:"");
+  else $("#meta").innerHTML=`共 ${L.length} 期，資料更新到 ${dateLabel(L[L.length-1].d)}`+
+    (S.source==="cache"?`<span class="src off">離線資料（${fmtTime(S.fetchedAt)} 讀取）</span>`:S.source==="checking"?`<span class="src">更新中…</span>`:"");
+  const miss=L.length?missedDraws(L[L.length-1].d):0;
+  $("#alert").hidden=miss<2;
+  $("#alert").textContent=miss>=2?`已經 ${miss} 個開獎日沒有新資料，數字可能不是最新的。`:"";
   $("#latest").innerHTML=L.length?L[L.length-1].n.map(ballHTML).join(""):"";
+  // 「資料」鍵只有管理者看得到；一般人從頁尾「管理者登入」進入
+  $('#bnav [data-g="data"]').hidden=!S.admin;
+  $("#loginLink").hidden=!!S.admin || S.group==="data";
   const subs=GROUPS[S.group];
   $("#tabs").hidden=subs.length<2;
   $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
@@ -277,6 +372,8 @@ function render(){
   $("#view").innerHTML=v;
   const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
   const ep=$("#evPer"); if(ep) ep.onchange=e=>{ S.evPer=+e.target.value; render(); };
+  const fi=$("#fileIn"); if(fi) fi.onchange=onFile;
+  const lf=$("#loginForm"); if(lf) lf.onsubmit=onLogin;
   const tr=document.querySelector(".heat")?.parentElement; if(tr) tr.scrollLeft=tr.scrollWidth;
 }
 
@@ -296,17 +393,61 @@ function go(group, tab){
   S.last[group]=S.tab; saveNav(); render(); window.scrollTo({top:0});
 }
 
-document.addEventListener("click", e=>{
-  const g=e.target.closest("#bnav button"); if(g){ go(g.dataset.g); return; }
+async function onLogin(e){
+  e.preventDefault();
+  const pw=$("#pwIn").value; if(!pw) return;
+  S.busy=true; S.msg=""; render();
+  try{
+    const r=await adminPost({password:pw, action:"check"});
+    if(r.ok){
+      S.admin=pw; S.msg="";
+      try{ localStorage.setItem(ADMIN_KEY, pw); }catch(_){}
+    } else { S.msg=r.msg; S.msgErr=true; }
+  }catch(err){ S.msg="連不上伺服器："+err.message; S.msgErr=true; }
+  S.busy=false; render();
+}
+
+document.addEventListener("click", async e=>{
+  const g=e.target.closest("#bnav button"); if(g){ S.msg=""; go(g.dataset.g); return; }
   const tab=e.target.closest("#tabs button"); if(tab){ go(S.group, tab.dataset.t); return; }
+  const del=e.target.closest("[data-del]");
+  if(del){ const d=del.dataset.del; if(confirm(`確定刪除 ${d} 這一期？`)) await runAdmin({action:"delete", date:d}); return; }
   const a=e.target.closest("[data-act]"); if(!a) return;
   const act=a.dataset.act;
-  if(act==="rand"){ S.randomPick=sample5(Math.random); render(); }
+  if(act==="login"){ S.msg=""; go("data"); }
+  else if(act==="logout"){ logout(); S.msg=""; go("tail"); }
+  else if(act==="import"){ if(await runAdmin({action:"import", csv:S.csv.text})) S.csv=null; render(); }
+  else if(act==="rand"){ S.randomPick=sample5(Math.random); render(); }
   else if(act==="test"){ a.disabled=true; a.textContent="計算中…"; setTimeout(()=>{ S.test=backtest(S.draws)||"few"; render(); },30); }
   else if(act==="ev"){ a.disabled=true; a.textContent="模擬中…"; setTimeout(()=>{ S.ev=simulateEV(S.draws); render(); },30); }
 });
 
+/* ---------- 下拉重新整理 ---------- */
+// 在最上面往下拉超過一段距離再放開，就重新向雲端讀資料
+const PULL = 64;
+let startY = null, pullH = 0;
+function setPull(h, text){ pullH=h; const p=$("#ptr"); p.style.height=h+"px"; p.textContent=text||""; }
+document.addEventListener("touchstart", e=>{
+  startY = (window.scrollY<=0 && !S.refreshing && e.touches.length===1) ? e.touches[0].clientY : null;
+}, {passive:true});
+document.addEventListener("touchmove", e=>{
+  if(startY===null) return;
+  const h=Math.min(Math.max(e.touches[0].clientY-startY,0)*0.5, PULL+16);
+  setPull(h, h>=PULL?"放開重新整理":"下拉重新整理");
+}, {passive:true});
+document.addEventListener("touchend", async ()=>{
+  if(startY===null) return;
+  startY=null;
+  if(pullH<PULL){ setPull(0); return; }
+  S.refreshing=true; setPull(44, "更新中…");
+  await fetchLatest();
+  S.refreshing=false;
+  setPull(44, S.source==="online" ? "已更新" : "連不上網路，顯示上次的資料");
+  setTimeout(()=>setPull(0), 900);
+});
+
 loadNav();
+if(S.group==="data" && !S.admin){ S.group="tail"; S.tab=GROUPS.tail[0][0]; }
 render();
 loadDraws();
 
