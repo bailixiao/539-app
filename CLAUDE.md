@@ -13,7 +13,6 @@
 
 ## 檔案
 - 539 尾數觀察站 App 計畫書.md：程式計畫書（架構、階段、驗收標準、已決定事項），以它為準。
-- docs/spec.md：舊的精簡版規格書，和計畫書衝突時以計畫書為準。
 - reference/539-tail.html：目前已經做好、驗證過的單檔版本。所有統計計算都以它為準，搬到新檔案時邏輯照抄，不要改公式。
 - data/539-draws.csv：2024/1/1 到 2026/10/6 共 872 期開獎號碼，要匯入 Google Sheet 用。
 - app/：PWA 前端（index.html、style.css、app.js、stats.js、manifest.json、sw.js、icons/）
