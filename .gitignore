@@ -1,0 +1,26 @@
+# 台彩官網下載的原始 CSV（不上傳）
+/2024/
+/2025/
+/2026/
+
+# 密碼、金鑰、環境設定
+.env
+.env.*
+*.key
+*.pem
+secrets*
+*.secret
+
+# Apps Script 本機工具（clasp）的登入資料
+.clasprc.json
+
+# 系統與編輯器產生的檔案
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+node_modules/
+
+# Claude Code 本機設定
+.claude/settings.local.json

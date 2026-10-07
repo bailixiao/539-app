@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>539 尾數觀察站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F5F4; --panel:#FFFFFF; --ink:#16202A; --muted:#66707C; --line:#DDE2E0;
+  --hot:#D23A2E; --cold:#2B5DC8; --exp:#16202A; --soft:#E9EDEB; --ok:#2F7D5B;
+  --num:"Barlow Semi Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --txt:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12171C; --panel:#1A2128; --ink:#E7ECEF; --muted:#94A0AB; --line:#2C353E;
+  --hot:#FF6B5E; --cold:#6E9BFF; --exp:#E7ECEF; --soft:#232B33; --ok:#5FC495;}}
+:root[data-theme="dark"]{
+  --bg:#12171C; --panel:#1A2128; --ink:#E7ECEF; --muted:#94A0AB; --line:#2C353E;
+  --hot:#FF6B5E; --cold:#6E9BFF; --exp:#E7ECEF; --soft:#232B33; --ok:#5FC495;}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--txt);font-size:15px;line-height:1.6;-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px 40px}
+header{padding:20px 0 12px}
+h1{font-family:var(--num);font-weight:700;font-size:30px;line-height:1.1;margin:0;letter-spacing:.01em}
+h1 small{font-family:var(--txt);font-size:15px;font-weight:500;color:var(--muted);margin-left:6px}
+.meta{color:var(--muted);font-size:13px;margin-top:4px}
+.latest{display:flex;gap:6px;margin-top:12px;align-items:center;flex-wrap:wrap}
+.ball{width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--num);font-weight:700;font-size:19px;background:var(--panel);border:1.5px solid var(--line);position:relative}
+.ball b{font-weight:700;color:var(--hot)}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:4px;overflow-x:auto;padding:8px 0;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 14px var(--txt);padding:7px 13px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--cold);outline-offset:2px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px}
+h2{font-size:17px;margin:0 0 4px}
+.note{color:var(--muted);font-size:13px;margin:4px 0 0}
+.range{display:flex;gap:6px;align-items:center;margin-top:12px;font-size:14px;color:var(--muted)}
+select,input[type=date]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.rows{margin-top:12px}
+.row{display:grid;grid-template-columns:30px 1fr 78px;gap:10px;align-items:center;padding:5px 0}
+.digit{font-family:var(--num);font-weight:700;font-size:24px;text-align:center}
+.track{position:relative;height:16px;background:var(--soft);border-radius:3px}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--muted)}
+.fill.hot{background:var(--hot)} .fill.cold{background:var(--cold)}
+.exp{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--exp)}
+.val{font-family:var(--num);font-size:15px;text-align:right;line-height:1.2}
+.val span{display:block;font-size:12px;color:var(--muted)}
+.verdict{margin-top:14px;padding:10px 12px;border-left:3px solid var(--ok);background:var(--soft);border-radius:0 6px 6px 0;font-size:14px}
+.verdict.warn{border-color:var(--hot)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 4px;text-align:right;border-bottom:1px solid var(--line)}
+th{font-weight:500;color:var(--muted);font-size:12.5px}
+td:first-child,th:first-child{text-align:center}
+td.d{font-family:var(--num);font-weight:700;font-size:20px}
+td .n{font-family:var(--num);font-size:16px}
+.scroll{overflow-x:auto;margin-top:12px}
+.heat{display:grid;gap:2px}
+.heat .c{width:12px;height:16px;border-radius:2px;background:var(--soft)}
+.heat .c.l1{background:color-mix(in srgb,var(--hot) 45%,var(--soft))}
+.heat .c.l2{background:var(--hot)}
+.heat .lab{font-family:var(--num);font-weight:700;font-size:14px;width:16px;text-align:center;line-height:16px;position:sticky;left:0;background:var(--panel)}
+.legend{display:flex;gap:12px;font-size:12.5px;color:var(--muted);margin-top:8px;align-items:center}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.btn{font:500 15px var(--txt);border:none;border-radius:8px;padding:10px 16px;background:var(--ink);color:var(--bg);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.4;cursor:default}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.picked{display:flex;gap:6px;margin-top:12px;min-height:38px}
+.grid39{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:10px}
+.grid39 button{aspect-ratio:1;border-radius:50%;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);font:700 16px var(--num);cursor:pointer;padding:0}
+.grid39 button[aria-pressed="true"]{background:var(--hot);border-color:var(--hot);color:#fff}
+textarea{width:100%;min-height:90px;font:13px/1.5 var(--txt);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
+.list .it{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.list .it span.ns{font-family:var(--num);font-size:16px;letter-spacing:.04em}
+.x{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:4px 6px}
+.empty{text-align:center;padding:28px 8px;color:var(--muted)}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--soft);color:var(--muted);margin-left:6px;vertical-align:2px}
+.msg{font-size:13px;margin-top:8px;color:var(--ok);min-height:1em}
+.msg.err{color:var(--hot)}
+footer{color:var(--muted);font-size:12.5px;margin-top:20px;line-height:1.7}
+@media (prefers-reduced-motion:no-preference){.fill{transition:width .35s ease}}
+.row.wide{grid-template-columns:62px 1fr 92px}
+.lbl{font-family:var(--num);font-weight:600;font-size:16px;text-align:left}
+tr.theo td{color:var(--muted);font-weight:500}
+.ngrid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-top:12px}
+.nc{border-radius:6px;padding:4px 0;text-align:center;line-height:1.15;background:var(--soft)}
+.nc b{display:block;font:700 17px var(--num)}
+.nc span{font:500 12px var(--num);opacity:.85}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.two .it span.n{font-size:13px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.kpis div{background:var(--soft);border-radius:8px;padding:8px 10px}
+.kpis span{display:block;font-size:12px;color:var(--muted)}
+.kpis b{font:700 20px var(--num)}
+.kpis b.neg{color:var(--hot)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>539 尾數觀察站<small>今彩539</small></h1>
+  <div class="meta" id="meta">讀取資料中…</div>
+  <div class="latest" id="latest"></div>
+</header>
+
+<nav class="tabs" role="tablist" id="tabs">
+  <button role="tab" data-t="dist" aria-selected="true">尾數分布</button>
+  <button role="tab" data-t="gap">遺漏期數</button>
+  <button role="tab" data-t="trend">熱冷走勢</button>
+  <button role="tab" data-t="num">單號冷熱</button>
+  <button role="tab" data-t="rep">連莊</button>
+  <button role="tab" data-t="combo">組合特徵</button>
+  <button role="tab" data-t="test">選號回測</button>
+  <button role="tab" data-t="ev">期望值</button>
+  <button role="tab" data-t="data">資料</button>
+</nav>
+
+<main id="view"></main>
+
+<footer>每一期開獎都是獨立事件，過去的統計無法預測下一期。這個頁面只用來觀察數據，不構成投注建議。</footer>
+</div>
+
+<script>
+(function(){
+const C395 = 575757;
+const P_TAIL = d => d === 0 ? 1 - 376992/C395 : 1 - 324632/C395; // 某尾數在一期中至少出現一次的機率
+const K = d => d === 0 ? 3 : 4; // 每個尾數有幾個號碼
+const LS_KEY = "t539_draws_v1";
+
+const S = {
+  tab: "dist", range: 100, draws: [], source: "loading", canEdit: false, demo: false,
+  db: null, realDraws: [], pick: [], randomPick: null, test: null, csvPreview: null, msg: "", msgErr: false
+};
+
+/* ---------- 資料存取 ---------- */
+function sortDraws(a){ return a.slice().sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0); }
+function setDraws(list){
+  S.realDraws = sortDraws(list);
+  if(!S.demo) S.draws = S.realDraws;
+  S.test = null; S.ev = null; render();
+}
+function loadLocal(){
+  try{ const r = localStorage.getItem(LS_KEY); setDraws(r ? JSON.parse(r) : []); }
+  catch(e){ setDraws([]); }
+}
+function saveLocal(list){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(list)); }catch(e){}
+  setDraws(list);
+}
+async function persist(newList, years){
+  if(S.source === "db"){
+    const byYear = {};
+    newList.forEach(x=>{ const y = x.d.slice(0,4); (byYear[y] = byYear[y] || []).push(x); });
+    for(const y of years){
+      const ref = S.db.collection("draws").doc("y"+y);
+      if(byYear[y] && byYear[y].length) await ref.set({ list: sortDraws(byYear[y]) });
+      else await ref.delete();
+    }
+  } else saveLocal(newList);
+}
+async function upsert(items){
+  const map = new Map(S.realDraws.map(x=>[x.d,x]));
+  const years = new Set();
+  items.forEach(x=>{ map.set(x.d, x); years.add(x.d.slice(0,4)); });
+  await persist(sortDraws([...map.values()]), years);
+}
+async function removeDate(d){
+  const list = S.realDraws.filter(x=>x.d!==d);
+  await persist(list, new Set([d.slice(0,4)]));
+}
+
+async function init(){
+  render();
+  let db = null, user = null;
+  try{
+    if(window.claude && window.claude.use){
+      [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    }
+  }catch(e){ db = null; }
+  if(db){
+    S.db = db; S.source = "db";
+    try{ S.canEdit = user ? await user.canEdit() : false; }catch(e){ S.canEdit = false; }
+    db.collection("draws").onSnapshot(snap=>{
+      const all = [];
+      snap.docs.forEach(doc=>{ const v = doc.data(); if(v && Array.isArray(v.list)) all.push(...v.list); });
+      setDraws(all.filter(valid));
+    }, err=>{ flash("讀取資料失敗："+err.message, true); });
+  } else {
+    S.source = "local"; S.canEdit = true; loadLocal();
+  }
+}
+function valid(x){ return x && /^\d{4}-\d{2}-\d{2}$/.test(x.d) && Array.isArray(x.n) && x.n.length===5 && x.n.every(v=>v>=1&&v<=39); }
+
+/* ---------- 模擬資料 ---------- */
+function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function sample5(r){ const a=[]; while(a.length<5){ const v=1+Math.floor(r()*39); if(!a.includes(v)) a.push(v); } return a.sort((x,y)=>x-y); }
+function makeDemo(){
+  const r = rng(Date.now()%100000), out=[]; const d=new Date(); let n=0;
+  while(out.length<600){ d.setDate(d.getDate()-1); n++; if(d.getDay()===0) continue;
+    out.push({d:d.toISOString().slice(0,10), n:sample5(r)}); }
+  return sortDraws(out);
+}
+
+/* ---------- 統計 ---------- */
+function recent(){ return S.range==="all" ? S.draws : S.draws.slice(-S.range); }
+function tailCounts(list){ const c=Array(10).fill(0); list.forEach(x=>x.n.forEach(v=>c[v%10]++)); return c; }
+function gaps(){
+  const L=S.draws, res=[];
+  for(let d=0; d<10; d++){
+    let cur=null, run=0, longest=0;
+    for(let i=0;i<L.length;i++){
+      const has=L[i].n.some(v=>v%10===d);
+      if(has){ longest=Math.max(longest,run); run=0; } else run++;
+    }
+    longest=Math.max(longest,run); cur=run;
+    res.push({d, cur, longest, p:P_TAIL(d)});
+  }
+  return res;
+}
+const numsOfTail = d => { const a=[]; for(let v=1;v<=39;v++) if(v%10===d) a.push(v); return a; };
+const PRIZE=[0,0,50,300,20000,8000000];
+const MEM=new WeakMap();
+function mset(x){ let m=MEM.get(x); if(!m){ m=new Uint8Array(40); x.n.forEach(v=>m[v]=1); MEM.set(x,m); } return m; }
+function hits(pick,x){ const m=mset(x); let h=0; for(const v of pick) h+=m[v]; return h; }
+const STRATS=[["hotT","追熱尾"],["coldT","追冷尾"],["dualT","雙冷尾"],["hotN","追熱號"],["coldN","追冷號"],["rep","連莊"],["rand","隨機"]];
+function backtest(){
+  const L=S.draws, W=20, r=rng(539);
+  if(L.length < 130) return null;
+  const st={}; STRATS.forEach(([k])=>st[k]={h:0,h2:0,h3:0,pay:0}); let n=0;
+  const pickFrom=tails=>tails.map(d=>{const ns=numsOfTail(d); return ns[Math.floor(r()*ns.length)];});
+  for(let i=100;i<L.length;i++){
+    const c=tailCounts(L.slice(i-W,i)).map((v,d)=>({d,v:v/K(d),t:r()}));
+    const order=c.slice().sort((a,b)=>b.v-a.v||a.t-b.t).map(o=>o.d);
+    const r30=crossRank(L.slice(i-30,i)), r100=crossRank(L.slice(i-100,i));
+    const dualOrder=r30.map((x,d)=>({d,s:x.rank+r100[d].rank,t:r()})).sort((a,b)=>a.s-b.s||a.t-b.t).map(x=>x.d);
+    const nc=Array(40).fill(0); L.slice(i-30,i).forEach(x=>x.n.forEach(v=>nc[v]++));
+    const nOrder=[]; for(let v=1;v<=39;v++) nOrder.push({v,c:nc[v],t:r()});
+    nOrder.sort((a,b)=>b.c-a.c||a.t-b.t);
+    const picks={hotT:pickFrom(order.slice(0,5)), coldT:pickFrom(order.slice(5)), dualT:pickFrom(dualOrder.slice(0,5)),
+      hotN:nOrder.slice(0,5).map(o=>o.v), coldN:nOrder.slice(-5).map(o=>o.v), rep:L[i-1].n.slice(), rand:sample5(r)};
+    for(const k in picks){ const h=hits(picks[k],L[i]); st[k].h+=h; st[k].pay+=PRIZE[h]; if(h>=2)st[k].h2++; if(h>=3)st[k].h3++; }
+    n++;
+  }
+  return {n, st};
+}
+
+/* ---------- 畫面 ---------- */
+const $ = s => document.querySelector(s);
+function flash(m, err){ S.msg=m; S.msgErr=!!err; render(); }
+function ballHTML(v){ const s=String(v).padStart(2,"0"); return `<span class="ball">${s[0]}<b>${s[1]}</b></span>`; }
+function rangeHTML(){
+  const opts=[[10,"近 10 期"],[15,"近 15 期"],[20,"近 20 期"],[25,"近 25 期"],[30,"近 30 期"],[100,"近 100 期"],[300,"近 300 期"],["all","全部"]];
+  return `<div class="range">統計範圍 <select id="rangeSel">${opts.map(([v,t])=>`<option value="${v}" ${String(S.range)===String(v)?"selected":""}>${t}</option>`).join("")}</select></div>`;
+}
+function emptyHTML(){
+  return `<div class="panel empty">還沒有開獎資料。<br>${S.canEdit?"到「資料」分頁輸入或匯入，":"等管理者匯入資料，"}或先用模擬資料試玩。
+  <div class="btns" style="justify-content:center"><button class="btn ghost" data-act="demo">用模擬資料試玩</button></div></div>`;
+}
+
+function viewDist(){
+  const L=recent(); if(!L.length) return emptyHTML();
+  const c=tailCounts(L), N=L.length;
+  const exp=c.map((_,d)=>N*5*K(d)/39);
+  const max=Math.max(...c, ...exp)*1.08;
+  let chi=0; c.forEach((o,d)=>chi+=(o-exp[d])**2/exp[d]);
+  const rows=c.map((o,d)=>{
+    const dev=(o-exp[d])/exp[d]*100, cls=dev>10?"hot":dev<-10?"cold":"";
+    return `<div class="row"><div class="digit">${d}</div>
+      <div class="track"><div class="fill ${cls}" style="width:${o/max*100}%"></div><div class="exp" style="left:${exp[d]/max*100}%"></div></div>
+      <div class="val">${o} 次<span>${dev>=0?"+":""}${dev.toFixed(0)}%</span></div></div>`;
+  }).join("");
+  const ok=chi<16.92;
+  return `<div class="panel"><h2>各尾數出現次數</h2>
+    <p class="note">黑色直線是理論期望值。尾 0 只有 10、20、30 三個號碼，期望值本來就比較低。</p>
+    ${rangeHTML()}<div class="rows">${rows}</div>
+    <div class="verdict ${ok?"":"warn"}">卡方值 ${chi.toFixed(1)}（門檻 16.9）。${ok?"目前的高低差距，落在純隨機就會出現的範圍內。":"差距超過一般隨機波動，可能是資料量少或資料有誤，值得檢查一下資料。"}</div>
+    <p class="note">卡方檢定用來判斷「實際次數和理論值的差距，是不是運氣就能解釋」。低於門檻代表運氣就能解釋。</p></div>${crossHTML()}`;
+}
+
+/* 近 30 / 近 100 交叉比對：依號碼數校正後排名，兩邊都排最後 3 名的叫「雙冷」 */
+function crossRank(list){
+  const c=tailCounts(list), N=list.length;
+  // z 分數：每期 5 球中某尾數的顆數是超幾何分布，變異數 = 5·p·(1-p)·34/38
+  const r=c.map((o,d)=>{ const p=K(d)/39, E=N*5*p, sd=Math.sqrt(N*5*p*(1-p)*34/38);
+    return {d,o,E,dev:(o-E)/E,z:(o-E)/sd}; });
+  const order=r.slice().sort((a,b)=>a.z-b.z).map(x=>x.d); // 冷 → 熱
+  r.forEach(x=>x.rank=order.indexOf(x.d)+1);
+  return r;
+}
+function crossHTML(){
+  const L=S.draws;
+  if(L.length<100) return `<div class="panel"><h2>近 30 × 近 100 交叉比對</h2><p class="note">至少要 100 期資料才能比對，目前 ${L.length} 期。</p></div>`;
+  const a=crossRank(L.slice(-30)), b=crossRank(L.slice(-100));
+  const rows=a.map((x,d)=>({d,a:x,b:b[d],sum:x.rank+b[d].rank})).sort((p,q)=>p.sum-q.sum);
+  const zf=v=>`${v>=0?"+":"−"}${Math.abs(v).toFixed(1)}`;
+  const zc=v=>v<=-2?' style="color:var(--cold);font-weight:700"':v>=2?' style="color:var(--hot);font-weight:700"':"";
+  const both=rows.filter(r=>r.a.rank<=3&&r.b.rank<=3).map(r=>`尾 ${r.d}`);
+  const tr=rows.map(r=>{
+    const tag=r.a.rank<=3&&r.b.rank<=3?'<span class="tag" style="background:var(--cold);color:#fff">雙冷</span>'
+      :r.a.rank>=8&&r.b.rank>=8?'<span class="tag" style="background:var(--hot);color:#fff">雙熱</span>':"";
+    return `<tr><td class="d">${r.d}</td><td><span class="n">${r.a.o}</span> <small${zc(r.a.z)}>z ${zf(r.a.z)}</small></td>
+      <td><span class="n">${r.b.o}</span> <small${zc(r.b.z)}>z ${zf(r.b.z)}</small></td><td><span class="n">${r.sum}</span></td><td>${tag}</td></tr>`;
+  }).join("");
+  return `<div class="panel"><h2>近 30 × 近 100 交叉比對</h2>
+    <p class="note">兩個區間各自依 z 分數排名，1 = 最冷。z 分數 = 跟理論值的差距 ÷ 正常會晃動的幅度，已同時校正尾 0 只有 3 個號碼、以及期望值小時波動看起來比較大的問題。z 在 ±2 以內算正常晃動，超過才標顏色。合計名次越小，代表短期和中期都偏少。兩邊都在最冷 3 名內，標為「雙冷」。</p>
+    <div class="scroll"><table><thead><tr><th>尾數</th><th>近 30 期</th><th>近 100 期</th><th>合計名次</th><th></th></tr></thead><tbody>${tr}</tbody></table></div>
+    <div class="verdict">${both.length?`目前雙冷：${both.join("、")}。`:"目前沒有尾數同時在兩個區間都排最冷 3 名。"}注意近 30 期本來就包含在近 100 期裡，所以兩邊會有一部分重疊，不算兩個獨立證據。「雙冷」是不是真的比較會出，可以到「選號回測」看結果。</div></div>`;
+}
+
+function viewGap(){
+  if(!S.draws.length) return emptyHTML();
+  const g=gaps();
+  const rows=g.map(x=>{
+    const prob=Math.pow(1-x.p,x.cur)*100;
+    return `<tr><td class="d">${x.d}</td><td><span class="n">${x.cur}</span></td><td><span class="n">${x.longest}</span></td>
+      <td><span class="n">${((1-x.p)/x.p).toFixed(1)}</span></td><td><span class="n">${x.cur?prob.toFixed(prob<1?2:1)+"%":"—"}</span></td></tr>`;
+  }).join("");
+  return `<div class="panel"><h2>遺漏期數</h2>
+    <p class="note">目前遺漏：從最新一期往回算，連續幾期沒開出這個尾數。統計全部 ${S.draws.length} 期。</p>
+    <div class="scroll"><table><thead><tr><th>尾數</th><th>目前遺漏</th><th>歷史最長</th><th>平均遺漏</th><th>連續遺漏機率</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="verdict">「連續遺漏機率」是指連續這麼多期都沒開出的機率。就算遺漏很久，下一期開出的機率仍然固定：尾 0 約 34.5%，其他尾數約 43.6%，不會因為「很久沒出」而變高。</div></div>`;
+}
+
+function viewTrend(){
+  if(!S.draws.length) return emptyHTML();
+  const L=S.draws.slice(-60), n=L.length;
+  let cells="";
+  for(let d=0; d<10; d++){
+    cells+=`<div class="lab">${d}</div>`;
+    L.forEach(x=>{ const k=x.n.filter(v=>v%10===d).length; cells+=`<div class="c ${k>=2?"l2":k===1?"l1":""}" title="${x.d}"></div>`; });
+  }
+  const w=S.draws.slice(-20), c=tailCounts(w).map((v,d)=>({d,r:v/(w.length*5*K(d)/39)}));
+  const s=c.slice().sort((a,b)=>b.r-a.r);
+  const tag=a=>a.map(o=>`尾 ${o.d}`).join("、");
+  return `<div class="panel"><h2>近 ${n} 期熱冷走勢</h2>
+    <p class="note">每一欄是一期，越右邊越新。可以左右滑動。</p>
+    <div class="scroll"><div class="heat" style="grid-template-columns:16px repeat(${n},12px)">${cells}</div></div>
+    <div class="legend"><span><i style="background:var(--soft)"></i>沒開出</span><span><i style="background:color-mix(in srgb,var(--hot) 45%,var(--soft))"></i>1 個</span><span><i style="background:var(--hot)"></i>2 個以上</span></div>
+    <div class="verdict">近 20 期相對最熱：${tag(s.slice(0,3))}；相對最冷：${tag(s.slice(-3).reverse())}。已依各尾數的號碼數量校正。冷熱會一直輪替，到「選號回測」可以看追熱、追冷到底有沒有用。</div></div>`;
+}
+
+function viewTest(){
+  const rp=S.randomPick;
+  let html=`<div class="panel"><h2>隨機選號</h2>
+    <p class="note">任何一組號碼中頭獎的機率都是 1/575,757，用統計選和隨機選一樣。</p>
+    <div class="picked">${rp?rp.map(ballHTML).join(""):""}</div>
+    <div class="btns"><button class="btn" data-act="rand">產生一組號碼</button></div></div>`;
+  if(!S.draws.length) return html+emptyHTML();
+  const t=S.test;
+  html+=`<div class="panel"><h2>策略回測</h2>
+    <p class="note">每一期只用「那一期之前」的資料選 5 個號碼，再對當期開獎，從第 101 期一路跑到最新一期。</p>
+    <p class="note">追熱尾／追冷尾：前 20 期最熱／最冷的 5 個尾數各挑 1 號。雙冷尾：近 30 × 近 100 交叉比對最冷的 5 個尾數。追熱號／追冷號：前 30 期出現最多／最少的 5 個號碼。連莊：直接買上一期的 5 個號碼。隨機：亂數。</p>`;
+  if(!t){ html+=`<div class="btns"><button class="btn" data-act="test">開始回測</button></div></div>`; return html; }
+  if(t==="few"){ html+=`<p class="msg err">資料至少要 130 期才能回測。</p></div>`; return html; }
+  const row=(name,s)=>`<tr><td>${name}</td><td><span class="n">${(s.h/t.n).toFixed(3)}</span></td><td><span class="n">${(s.h2/t.n*100).toFixed(1)}%</span></td><td><span class="n">${(s.h3/t.n*100).toFixed(2)}%</span></td><td><span class="n">${(s.pay/(t.n*50)*100).toFixed(0)}%</span></td></tr>`;
+  html+=`<div class="scroll"><table><thead><tr><th>策略</th><th>平均中幾號</th><th>中 2+</th><th>中 3+</th><th>回收率</th></tr></thead><tbody>
+    ${STRATS.map(([k,name])=>row(name,t.st[k])).join("")}
+    <tr class="theo"><td>理論值</td><td><span class="n">0.641</span></td><td><span class="n">11.4%</span></td><td><span class="n">1.00%</span></td><td><span class="n">56%</span></td></tr></tbody></table></div>
+    <div class="verdict">共回測 ${t.n} 期，每期每種策略買一注 50 元。所有策略如果都在理論值附近上下跳動，就代表用歷史資料選號沒有比亂數厲害。回收率波動很大，因為只要剛好中一次貳獎（2 萬元）就會拉高好幾十 %，這是運氣不是策略。</div>
+    <div class="btns"><button class="btn ghost" data-act="test">重新回測</button></div></div>`;
+  return html;
+}
+
+/* ---------- 單號冷熱 ---------- */
+function viewNum(){
+  const L=recent(); if(!L.length) return emptyHTML();
+  const N=L.length, E=N*5/39, sd=Math.sqrt(N*(5/39)*(34/39));
+  const cnt=Array(40).fill(0); L.forEach(x=>x.n.forEach(v=>cnt[v]++));
+  const arr=[]; let chi=0;
+  for(let v=1;v<=39;v++){ const z=(cnt[v]-E)/sd; arr.push({v,o:cnt[v],z}); chi+=(cnt[v]-E)**2/E; }
+  chi*=38/34; // 每期 5 球不重複，修正成近似卡方
+  const cells=arr.map(x=>{
+    const a=Math.min(Math.abs(x.z)/2.5,1)*70, col=x.z>=0?"var(--hot)":"var(--cold)";
+    const strong=Math.abs(x.z)>=1.5;
+    return `<div class="nc" style="background:color-mix(in srgb,${col} ${a.toFixed(0)}%,var(--soft));${strong?"color:#fff":""}"><b>${String(x.v).padStart(2,"0")}</b><span>${x.o}</span></div>`;
+  }).join("");
+  const s=arr.slice().sort((a,b)=>b.z-a.z);
+  const li=a=>a.map(x=>`<div class="it"><span class="ns">${String(x.v).padStart(2,"0")}</span><span>${x.o} 次</span><span class="n">z ${x.z>=0?"+":"−"}${Math.abs(x.z).toFixed(1)}</span></div>`).join("");
+  const ok=chi<53.4;
+  return `<div class="panel"><h2>單號冷熱</h2>
+    <p class="note">每格是一個號碼，下方數字是出現次數。理論上每個號碼 ${E.toFixed(1)} 次。越紅越熱、越藍越冷，顏色深淺依 z 分數。</p>
+    ${rangeHTML()}<div class="ngrid">${cells}</div></div>
+    <div class="panel"><div class="two"><div><h2>最熱 5 號</h2><div class="list">${li(s.slice(0,5))}</div></div>
+    <div><h2>最冷 5 號</h2><div class="list">${li(s.slice(-5).reverse())}</div></div></div>
+    <div class="verdict ${ok?"":"warn"}">39 個號碼的卡方值 ${chi.toFixed(1)}（門檻 53.4）。${ok?"冷熱差距在純隨機的範圍內。":"差距超過一般隨機波動，可以檢查資料，或是資料期數太少。"}單號切得比尾數細，每格的樣本更少，所以看起來會比尾數更「冷熱分明」，但那多半是雜訊。</div></div>`;
+}
+
+/* ---------- 連莊 ---------- */
+const REP_THEO=[278256,231880,59840,5610,170,1].map(c=>c/575757);
+function viewRep(){
+  const L=S.draws; if(L.length<2) return emptyHTML();
+  const ks=Array(6).fill(0); let sum=0;
+  for(let i=1;i<L.length;i++){ const k=hits(L[i-1].n,L[i]); ks[k]++; sum+=k; }
+  const n=L.length-1, mean=sum/n;
+  const maxP=Math.max(...ks.map(k=>k/n),...REP_THEO)*1.08;
+  const rows=ks.map((k,j)=>`<div class="row wide"><div class="lbl">${j} 個</div>
+    <div class="track"><div class="fill" style="width:${k/n/maxP*100}%"></div><div class="exp" style="left:${REP_THEO[j]/maxP*100}%"></div></div>
+    <div class="val">${(k/n*100).toFixed(1)}%<span>理論 ${(REP_THEO[j]*100).toFixed(REP_THEO[j]<0.01?2:1)}%</span></div></div>`).join("");
+  const last=L[L.length-1], prev=L[L.length-2];
+  const rep=last.n.filter(v=>prev.n.includes(v));
+  return `<div class="panel"><h2>連莊統計</h2>
+    <p class="note">每一期跟上一期比，有幾個號碼重複開出。統計全部 ${n} 組相鄰兩期，白線／黑線是理論值。</p>
+    <div class="rows">${rows}</div>
+    <div class="verdict">實際平均每期連莊 ${mean.toFixed(3)} 個，理論值 0.641 個。最新一期 ${last.d} ${rep.length?`連莊了 ${rep.map(v=>String(v).padStart(2,"0")).join("、")}`:"沒有連莊號碼"}。「上期開過的號碼這期比較容易再出」如果是真的，實際值會明顯高於理論值；兩者接近，就代表上一期對這一期沒有影響。</div></div>`;
+}
+
+/* ---------- 組合特徵 ---------- */
+let THEO=null;
+const SUM_LABELS=["≤59","60–79","80–99","100–119","120–139","≥140"];
+const sumBin=s=>s<60?0:s<80?1:s<100?2:s<120?3:s<140?4:5;
+function feats(n){
+  let s=0,odd=0,big=0,pairs=0;
+  for(let j=0;j<5;j++){ s+=n[j]; if(n[j]%2) odd++; if(n[j]>=20) big++; if(j&&n[j]-n[j-1]===1) pairs++; }
+  return {sum:sumBin(s), odd, big, cons:Math.min(pairs,2)};
+}
+function theory(){
+  if(THEO) return THEO;
+  const T={sum:Array(6).fill(0),odd:Array(6).fill(0),big:Array(6).fill(0),cons:Array(3).fill(0)};
+  const n=[0,0,0,0,0];
+  for(n[0]=1;n[0]<=35;n[0]++)for(n[1]=n[0]+1;n[1]<=36;n[1]++)for(n[2]=n[1]+1;n[2]<=37;n[2]++)for(n[3]=n[2]+1;n[3]<=38;n[3]++)for(n[4]=n[3]+1;n[4]<=39;n[4]++){
+    const f=feats(n); T.sum[f.sum]++; T.odd[f.odd]++; T.big[f.big]++; T.cons[f.cons]++;
+  }
+  for(const k in T) T[k]=T[k].map(c=>c/575757);
+  return THEO=T;
+}
+function featBlock(title,note,labels,theo,act,N){
+  const maxP=Math.max(...act.map(a=>a/N),...theo)*1.08;
+  const best=theo.indexOf(Math.max(...theo));
+  return `<div class="panel"><h2>${title}</h2><p class="note">${note}</p><div class="rows">${labels.map((l,j)=>`<div class="row wide"><div class="lbl">${l}</div>
+    <div class="track"><div class="fill" style="width:${act[j]/N/maxP*100}%"></div><div class="exp" style="left:${theo[j]/maxP*100}%"></div></div>
+    <div class="val">${(act[j]/N*100).toFixed(1)}%<span>理論 ${(theo[j]*100).toFixed(1)}%</span></div></div>`).join("")}</div>
+    <p class="note">理論上最常見的是「${labels[best]}」，有 ${Math.round(theo[best]*575757).toLocaleString()} 組號碼屬於這一類。</p></div>`;
+}
+function viewCombo(){
+  const L=recent(); if(!L.length) return emptyHTML();
+  const T=theory(), N=L.length;
+  const A={sum:Array(6).fill(0),odd:Array(6).fill(0),big:Array(6).fill(0),cons:Array(3).fill(0)};
+  L.forEach(x=>{ const f=feats(x.n); A.sum[f.sum]++; A.odd[f.odd]++; A.big[f.big]++; A.cons[f.cons]++; });
+  const ratio=[0,1,2,3,4,5].map(k=>`${k}:${5-k}`);
+  return `<div class="panel"><h2>組合特徵</h2>
+    <p class="note">把每期開出的 5 個號碼，依和值、奇偶、大小、連號分類，看實際出現比例跟理論值差多少。理論值是把全部 575,757 種組合一一算出來的。</p>${rangeHTML()}</div>
+    ${featBlock("和值","5 個號碼加起來的總和，平均是 100。",SUM_LABELS,T.sum,A.sum,N)}
+    ${featBlock("奇偶比（奇:偶）","1–39 有 20 個奇數、19 個偶數。",ratio,T.odd,A.odd,N)}
+    ${featBlock("大小比（大:小）","大號 20–39 共 20 個，小號 1–19 共 19 個。",ratio,T.big,A.big,N)}
+    ${featBlock("連號","相鄰號碼（例如 12、13）算一組連號。",["無連號","1 組","2 組以上"],T.cons,A.cons,N)}
+    <div class="panel"><div class="verdict">這頁最重要的觀念：「3:2 最常出」「和值 80–119 最常見」都是真的，但原因只是這些類別包含的號碼組合比較多。你買的永遠是「一組」號碼，任何一組中頭獎的機率都是 1/575,757，不管它是 3:2 還是 5:0。</div></div>`;
+}
+
+/* ---------- 期望值 ---------- */
+const PRIZES=[["頭獎","5 個全中",1,8000000,0.796],["貳獎","中 4 個",170,20000,0.796],["參獎","中 3 個",5610,300,0.996],["肆獎","中 2 個",59840,50,1]];
+function viewEV(){
+  let pre=0, post=0;
+  const rows=PRIZES.map(([name,cond,c,p,tx])=>{ const e=c*p/575757; pre+=e; post+=e*tx;
+    return `<tr><td>${name}</td><td>${cond}</td><td><span class="n">1/${Math.round(575757/c).toLocaleString()}</span></td><td><span class="n">${p.toLocaleString()}</span></td><td><span class="n">${e.toFixed(2)}</span></td></tr>`; }).join("");
+  const per=S.evPer||1, yr=312, cost=per*50*yr;
+  let html=`<div class="panel"><h2>每注期望值</h2>
+    <p class="note">期望值 = 每個獎項的「中獎機率 × 獎金」加起來，代表長期平均每買一注能拿回多少錢。</p>
+    <div class="scroll"><table><thead><tr><th>獎項</th><th>條件</th><th>機率</th><th>獎金</th><th>期望值</th></tr></thead><tbody>${rows}
+    <tr class="theo"><td colspan="4">合計（稅前）</td><td><span class="n">${pre.toFixed(2)}</span></td></tr></tbody></table></div>
+    <div class="verdict warn">每注 50 元，平均只拿回 ${pre.toFixed(1)} 元，回收率約 ${(pre/50*100).toFixed(0)}%。扣掉中獎稅金後約 ${post.toFixed(1)} 元（${(post/50*100).toFixed(0)}%）。也就是說，長期每買 100 元，平均會虧掉約 ${(100-pre/50*100).toFixed(0)}–${(100-post/50*100).toFixed(0)} 元。</div>
+    <p class="note">稅金以「單注獎金超過 5,000 元扣 20%、250 元以上扣 0.4% 印花稅」估算。頭獎若同期超過 3 注中獎，總額 2,400 萬由大家均分，實際期望值還會再低一點。</p></div>`;
+  html+=`<div class="panel"><h2>一年會花多少</h2>
+    <div class="range">每期買 <select id="evPer">${[1,2,5,10].map(v=>`<option value="${v}" ${v===per?"selected":""}>${v} 注</option>`).join("")}</select>，一年約 ${yr} 期</div>
+    <div class="kpis"><div><span>一年花費</span><b>${cost.toLocaleString()}</b></div><div><span>平均拿回（稅前）</span><b>${Math.round(per*yr*pre).toLocaleString()}</b></div><div><span>平均淨虧</span><b class="neg">${Math.round(cost-per*yr*pre).toLocaleString()}</b></div></div></div>`;
+  const ev=S.ev;
+  html+=`<div class="panel"><h2>用真實開獎資料模擬</h2>
+    <p class="note">假設有 1,000 個人，每個人在過去 ${S.draws.length} 期每期都買一注隨機號碼，看最後各賺賠多少。</p>`;
+  if(S.draws.length<10) return html+`<p class="note">資料不足。</p></div>`;
+  if(!ev) return html+`<div class="btns"><button class="btn" data-act="ev">開始模擬</button></div></div>`;
+  html+=`<div class="kpis"><div><span>每人花費</span><b>${ev.cost.toLocaleString()}</b></div><div><span>中位數回收率</span><b>${((ev.med+ev.cost)/ev.cost*100).toFixed(0)}%</b></div><div><span>最後賺錢的人</span><b>${ev.win} / 1000</b></div></div>
+    <div class="kpis"><div><span>最好的人</span><b>${ev.best>=0?"+":""}${ev.best.toLocaleString()}</b></div><div><span>中位數</span><b class="neg">${ev.med.toLocaleString()}</b></div><div><span>最差的人</span><b class="neg">${ev.worst.toLocaleString()}</b></div></div>
+    <div class="verdict">1,000 人全部加起來平均回收率是 ${(ev.avg*100).toFixed(0)}%${ev.jack?`（其中 ${ev.jack} 人中過頭獎，把平均拉高很多）`:""}，但「一般人」看中位數：只拿回 ${((ev.med+ev.cost)/ev.cost*100).toFixed(0)}%。${ev.win?`賺錢的 ${ev.win} 人，都是中過頭獎或至少兩次貳獎。`:"沒有任何人賺錢。"}<br>這是彩券最反直覺的地方：56% 的期望值，大部分是靠極少數人中大獎撐起來的。沒中大獎的人，只靠參獎、肆獎，回收率大約只有 16%。</div>
+    <div class="btns"><button class="btn ghost" data-act="ev">再模擬一次</button></div></div>`;
+  return html;
+}
+function simulateEV(){
+  const L=S.draws, res=[];
+  let jack=0;
+  for(let p=0;p<1000;p++){ let pay=0, j=0; for(const x of L){ const h=hits(sample5(Math.random),x); pay+=PRIZE[h]; if(h===5) j=1; } jack+=j; res.push(pay); }
+  const cost=L.length*50, net=res.map(v=>v-cost).sort((a,b)=>a-b);
+  return {cost, jack, avg:res.reduce((a,b)=>a+b,0)/1000/cost, win:net.filter(v=>v>0).length, best:net[999], worst:net[0], med:net[500]};
+}
+
+function viewData(){
+  let html="";
+  html+=`<div class="panel"><h2>資料狀態${S.demo?'<span class="tag">模擬資料中</span>':""}</h2>
+    <p class="note">${S.source==="db"?"資料存在雲端，分享這個頁面的親友都會看到同一份。":"目前資料只存在這支手機的瀏覽器裡。"}
+    正式資料共 ${S.realDraws.length} 期。</p>
+    <div class="btns">${S.demo?'<button class="btn ghost" data-act="undemo">回到正式資料</button>':'<button class="btn ghost" data-act="demo">用模擬資料試玩</button>'}</div>
+    <p class="note">模擬資料是隨機產生的 600 期，只在這次瀏覽有效，不會存檔。</p></div>`;
+  html+=`<div class="panel"><h2>自動更新</h2><p class="note">每週一到週六晚上 9:19，系統會自動查詢當天開獎號碼，兩個網站核對一致後才寫入。不需要手動輸入。</p></div>`;
+  if(!S.canEdit){
+    return html+`<div class="panel"><p class="note" style="margin:0">開獎資料由管理者負責更新。</p></div>`;
+  }
+  const pv=S.csvPreview;
+  html+=`<div class="panel"><h2>匯入 CSV</h2>
+    <p class="note">上傳從台灣彩券官網下載的檔案，或直接貼上文字。每一行要有開獎日期和 5 個號碼，例如：<br>2026/10/06,03,15,22,28,37</p>
+    <div class="btns"><label class="btn ghost" style="display:inline-block">選擇檔案<input type="file" id="fileIn" accept=".csv,.txt,text/csv" hidden></label></div>
+    <textarea id="csvIn" placeholder="或把資料貼在這裡">${S.csvText||""}</textarea>
+    <div class="btns"><button class="btn ghost" data-act="parse">檢查資料</button>
+    ${pv&&pv.items.length?`<button class="btn" data-act="import">匯入 ${pv.items.length} 期</button>`:""}</div>
+    ${pv?`<p class="note">讀到 ${pv.items.length} 期，跳過 ${pv.skipped} 行。${pv.items.length?`範圍 ${pv.items[0].d} 到 ${pv.items[pv.items.length-1].d}。`:""}匯入前請抽查一兩期跟官網對一下。</p>`:""}</div>`;
+  const last=S.realDraws.slice(-10).reverse();
+  html+=`<div class="panel"><h2>最近輸入的資料</h2><div class="list">${last.length?last.map(x=>`<div class="it"><span>${x.d}</span><span class="ns">${x.n.map(v=>String(v).padStart(2,"0")).join(" ")}</span><button class="x" data-del="${x.d}" aria-label="刪除 ${x.d}">刪除</button></div>`).join(""):'<p class="note">還沒有資料。</p>'}</div></div>`;
+  return html;
+}
+
+function render(){
+  const L=S.draws;
+  if(S.source==="loading") $("#meta").textContent="讀取資料中…";
+  else if(!L.length) $("#meta").textContent="尚無開獎資料";
+  else $("#meta").innerHTML=`共 ${L.length} 期，最新 ${L[L.length-1].d}${S.demo?'<span class="tag">模擬資料</span>':""}`;
+  $("#latest").innerHTML=L.length?L[L.length-1].n.map(ballHTML).join(""):"";
+  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.t===S.tab));
+  const v={dist:viewDist,gap:viewGap,trend:viewTrend,num:viewNum,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,data:viewData}[S.tab]();
+  $("#view").innerHTML=v+(S.msg?`<p class="msg ${S.msgErr?"err":""}">${S.msg}</p>`:"");
+  const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
+  const ep=$("#evPer"); if(ep) ep.onchange=e=>{ S.evPer=+e.target.value; render(); };
+  const fi=$("#fileIn"); if(fi) fi.onchange=onFile;
+  const ci=$("#csvIn"); if(ci) ci.oninput=e=>{ S.csvText=e.target.value; };
+  const di=$("#dateIn"); if(di) di.onchange=e=>{ S.dateIn=e.target.value; };
+  const tr=document.querySelector(".heat")?.parentElement; if(tr) tr.scrollLeft=tr.scrollWidth;
+}
+
+/* ---------- CSV ---------- */
+function parseText(text){
+  const items=[]; let skipped=0;
+  text.split(/\r?\n/).forEach(line=>{
+    if(!line.trim()) return;
+    const m=line.match(/(\d{2,4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})/);
+    if(!m){ skipped++; return; }
+    let y=+m[1]; if(y<1911) y+=1911;
+    const mo=+m[2], da=+m[3];
+    if(mo<1||mo>12||da<1||da>31){ skipped++; return; }
+    const rest=line.replace(m[0]," ");
+    const nums=[];
+    (rest.match(/\d+/g)||[]).forEach(t=>{ const v=+t; if(t.length<=2&&v>=1&&v<=39&&!nums.includes(v)&&nums.length<5) nums.push(v); });
+    if(nums.length<5){ skipped++; return; }
+    items.push({d:`${y}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`, n:nums.sort((a,b)=>a-b)});
+  });
+  const map=new Map(items.map(x=>[x.d,x]));
+  return {items:sortDraws([...map.values()]), skipped};
+}
+function onFile(e){
+  const f=e.target.files[0]; if(!f) return;
+  f.arrayBuffer().then(buf=>{
+    let t=new TextDecoder("utf-8").decode(buf);
+    if((t.match(/\uFFFD/g)||[]).length>5){ try{ t=new TextDecoder("big5").decode(buf); }catch(_){} }
+    S.csvText=t; S.csvPreview=parseText(t); S.msg=""; render();
+  });
+}
+
+/* ---------- 事件 ---------- */
+document.addEventListener("click", async e=>{
+  const tab=e.target.closest("#tabs button"); if(tab){ S.tab=tab.dataset.t; S.msg=""; render(); window.scrollTo({top:0}); return; }
+  const num=e.target.closest("[data-num]");
+  if(num){ const v=+num.dataset.num; if(S.pick.includes(v)) S.pick=S.pick.filter(x=>x!==v); else if(S.pick.length<5) S.pick.push(v); render(); return; }
+  const del=e.target.closest("[data-del]");
+  if(del){ if(confirm(`刪除 ${del.dataset.del} 這一期？`)){ try{ await removeDate(del.dataset.del); flash("已刪除"); }catch(err){ flash("刪除失敗："+(err.message||err.code), true);} } return; }
+  const a=e.target.closest("[data-act]"); if(!a) return;
+  const act=a.dataset.act;
+  if(act==="demo"){ S.demo=true; S.draws=makeDemo(); S.test=null; S.ev=null; S.msg=""; render(); }
+  else if(act==="undemo"){ S.demo=false; S.draws=S.realDraws; S.test=null; S.ev=null; render(); }
+  else if(act==="rand"){ S.randomPick=sample5(Math.random); render(); }
+  else if(act==="test"){ a.disabled=true; a.textContent="計算中…"; setTimeout(()=>{ S.test=backtest()||"few"; render(); },30); }
+  else if(act==="ev"){ a.disabled=true; a.textContent="模擬中…"; setTimeout(()=>{ S.ev=simulateEV(); render(); },30); }
+  else if(act==="clearpick"){ S.pick=[]; render(); }
+  else if(act==="save"){
+    const d=($("#dateIn")||{}).value;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d||"")) return flash("請選擇開獎日期", true);
+    try{ await upsert([{d, n:S.pick.slice().sort((x,y)=>x-y)}]); S.pick=[]; flash(`已儲存 ${d}`); }
+    catch(err){ flash("儲存失敗："+(err.message||err.code), true); }
+  }
+  else if(act==="parse"){ S.csvPreview=parseText(S.csvText||""); S.msg=""; render(); }
+  else if(act==="import"){
+    try{ await upsert(S.csvPreview.items); flash(`已匯入 ${S.csvPreview.items.length} 期`); S.csvPreview=null; S.csvText=""; render(); }
+    catch(err){ flash("匯入失敗："+(err.message||err.code), true); }
+  }
+});
+
+init();
+})();
+</script>
+</body>
+</html>
