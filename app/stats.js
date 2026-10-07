@@ -54,6 +54,22 @@ function crossTable(L){
   const a=crossRank(L.slice(-30)), b=crossRank(L.slice(-100));
   return a.map((x,d)=>({d,a:x,b:b[d],sum:x.rank+b[d].rank})).sort((p,q)=>p.sum-q.sum);
 }
+// 近 10／15／20／25／30 期各自最冷的尾數（用 crossRank 的 z 分數排，已校正尾 0 只有 3 個號碼）
+// z 一樣的並列成同一組；組一直加到涵蓋至少 top 個尾數為止
+const SHORT_RANGES=[10,15,20,25,30];
+function coldTails(L, top=3){
+  return SHORT_RANGES.filter(n=>L.length>=n).map(n=>{
+    const sorted=crossRank(L.slice(-n)).sort((a,b)=>a.z-b.z);
+    const groups=[]; let count=0;
+    for(const x of sorted){
+      const g=groups[groups.length-1];
+      if(g && Math.abs(g.z-x.z)<1e-9){ g.tails.push(x.d); count++; continue; }
+      if(count>=top) break;
+      groups.push({z:x.z, o:x.o, tails:[x.d]}); count++;
+    }
+    return {n, groups};
+  });
+}
 const isDualCold = r => r.a.rank<=3&&r.b.rank<=3;
 const isDualHot = r => r.a.rank>=8&&r.b.rank>=8;
 
