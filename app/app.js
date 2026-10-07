@@ -5,8 +5,17 @@
 const API = "https://script.google.com/macros/s/AKfycby_Za-SJp2fteT4vLspntfLjBp_GrRQpeihMLbOnnDDCgN05NzkqDXCb6wDAtK50LNH/exec";
 const LS_KEY = "t539_draws_v2";
 
+// 底部導覽 4 組，每組上方再用切換鈕換頁
+const GROUPS = {
+  tail: [["dist","分布"],["gap","遺漏"],["trend","走勢"],["cross","交叉比對"]],
+  num:  [["num","單號冷熱"],["rep","連莊"],["combo","組合特徵"]],
+  test: [["test","選號回測"],["ev","期望值"]],
+  data: [["data","資料"]]
+};
+const NAV_KEY = "t539_nav";
+
 const S = {
-  tab: "dist", range: 100, draws: [], source: "loading", fetchedAt: 0,
+  group: "tail", tab: "dist", last: {}, range: 100, draws: [], source: "loading", fetchedAt: 0,
   randomPick: null, test: null, ev: null, evPer: 1
 };
 
@@ -69,8 +78,9 @@ function viewDist(){
     <p class="note">黑色直線是理論期望值。尾 0 只有 10、20、30 三個號碼，期望值本來就比較低。</p>
     ${rangeHTML()}<div class="rows">${rows}</div>
     <div class="verdict ${ok?"":"warn"}">卡方值 ${chi.toFixed(1)}（門檻 16.9）。${ok?"目前的高低差距，落在純隨機就會出現的範圍內。":"差距超過一般隨機波動，可能是資料量少或資料有誤，值得檢查一下資料。"}</div>
-    <p class="note">卡方檢定用來判斷「實際次數和理論值的差距，是不是運氣就能解釋」。低於門檻代表運氣就能解釋。</p></div>${coldHTML()}${crossHTML()}`;
+    <p class="note">卡方檢定用來判斷「實際次數和理論值的差距，是不是運氣就能解釋」。低於門檻代表運氣就能解釋。</p></div>${coldHTML()}`;
 }
+function viewCross(){ return S.draws.length ? crossHTML() : emptyHTML(); }
 
 function coldHTML(){
   const rows=coldTails(S.draws);
@@ -259,8 +269,11 @@ function render(){
   else $("#meta").innerHTML=`共 ${L.length} 期，最新 ${L[L.length-1].d}`+
     (S.source==="cache"?`<span class="src off">離線資料（${fmtTime(S.fetchedAt)} 更新）</span>`:"");
   $("#latest").innerHTML=L.length?L[L.length-1].n.map(ballHTML).join(""):"";
-  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.t===S.tab));
-  const v={dist:viewDist,gap:viewGap,trend:viewTrend,num:viewNum,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,data:viewData}[S.tab]();
+  const subs=GROUPS[S.group];
+  $("#tabs").hidden=subs.length<2;
+  $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
+  document.querySelectorAll("#bnav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.g===S.group));
+  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,data:viewData}[S.tab]();
   $("#view").innerHTML=v;
   const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
   const ep=$("#evPer"); if(ep) ep.onchange=e=>{ S.evPer=+e.target.value; render(); };
@@ -268,8 +281,24 @@ function render(){
 }
 
 /* ---------- 事件 ---------- */
+// 記住上次看的分頁（每一組各記一個），下次打開回到同一頁
+function saveNav(){ try{ localStorage.setItem(NAV_KEY, JSON.stringify({group:S.group, last:S.last})); }catch(e){} }
+function loadNav(){
+  try{
+    const r=JSON.parse(localStorage.getItem(NAV_KEY));
+    if(r && GROUPS[r.group]){ S.group=r.group; S.last=r.last||{}; }
+  }catch(e){}
+  S.tab=GROUPS[S.group].some(([t])=>t===S.last[S.group]) ? S.last[S.group] : GROUPS[S.group][0][0];
+}
+function go(group, tab){
+  S.group=group;
+  S.tab=tab || (GROUPS[group].some(([t])=>t===S.last[group]) ? S.last[group] : GROUPS[group][0][0]);
+  S.last[group]=S.tab; saveNav(); render(); window.scrollTo({top:0});
+}
+
 document.addEventListener("click", e=>{
-  const tab=e.target.closest("#tabs button"); if(tab){ S.tab=tab.dataset.t; render(); window.scrollTo({top:0}); return; }
+  const g=e.target.closest("#bnav button"); if(g){ go(g.dataset.g); return; }
+  const tab=e.target.closest("#tabs button"); if(tab){ go(S.group, tab.dataset.t); return; }
   const a=e.target.closest("[data-act]"); if(!a) return;
   const act=a.dataset.act;
   if(act==="rand"){ S.randomPick=sample5(Math.random); render(); }
@@ -277,6 +306,10 @@ document.addEventListener("click", e=>{
   else if(act==="ev"){ a.disabled=true; a.textContent="模擬中…"; setTimeout(()=>{ S.ev=simulateEV(S.draws); render(); },30); }
 });
 
+loadNav();
 render();
 loadDraws();
+
+// 離線快取：讓 app 沒網路也打得開
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();

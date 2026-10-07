@@ -99,5 +99,13 @@ tr.theo td{color:var(--muted);font-weight:500}
 .cgrid .c.k1{background:var(--cold);color:#fff}
 .cgrid .c.k2{background:color-mix(in srgb,var(--cold) 60%,var(--soft));color:#fff}
 .cgrid .c.k3{background:color-mix(in srgb,var(--cold) 30%,var(--soft))}
+.wrap{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.tabs[hidden]{display:none}
+.bnav{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;color:var(--muted);font:500 14px var(--txt);padding:8px 0 7px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.bnav svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.bnav button[aria-selected="true"]{color:var(--ink);font-weight:700}
+.bnav button[aria-selected="true"] svg{stroke-width:2.4}
+@media (min-width:700px){.bnav{justify-content:center}.bnav button{flex:0 0 140px}}
 .meta .src{margin-left:6px}
 .meta .src.off{color:var(--hot)}
