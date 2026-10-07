@@ -75,13 +75,19 @@ function viewDist(){
 function coldHTML(){
   const rows=coldTails(S.draws);
   if(!rows.length) return "";
-  const grp=g=>`<span style="white-space:nowrap"><span class="n">尾 ${g.tails.join("、")}</span><small>（${g.o} 次）</small></span>`;
-  const tr=rows.map(r=>`<tr><td style="white-space:nowrap">近 ${r.n} 期</td><td style="text-align:left">${r.groups.map(grp).join(" › ")}</td></tr>`).join("");
-  const all=[...Array(10).keys()].filter(d=>rows.length===SHORT_RANGES.length&&rows.every(r=>r.groups.some(g=>g.tails.includes(d))));
+  const digits=[...Array(10).keys()];
+  const all=digits.filter(d=>rows.length===SHORT_RANGES.length&&rows.every(r=>r.groups.some(g=>g.tails.includes(d))));
+  let cells=`<div class="r">尾數</div>`+digits.map(d=>`<div class="h${all.includes(d)?" mark":""}">${d}</div>`).join("");
+  rows.forEach(r=>{
+    const c=tailCounts(S.draws.slice(-r.n));
+    const lv=d=>{ const i=r.groups.findIndex(g=>g.tails.includes(d)); return i<0?"":` k${i+1}`; };
+    cells+=`<div class="r">近 ${r.n} 期</div>`+digits.map(d=>`<div class="c${lv(d)}">${c[d]}</div>`).join("");
+  });
   return `<div class="panel"><h2>近 10–30 期最少出的尾數</h2>
-    <p class="note">每個區間各自排名，由最少往上列出最冷的 3 個尾數和實際出現次數；一樣冷的尾數並列在同一格，所以有時會超過 3 個。排名用 z 分數，已校正尾 0 只有 3 個號碼，所以尾 0 不會因為號碼少就一直墊底。</p>
-    <div class="scroll"><table><thead><tr><th>區間</th><th style="text-align:left">最少的尾數（由少到多）</th></tr></thead><tbody>${tr}</tbody></table></div>
-    <div class="verdict">${all.length?`${all.map(d=>`尾 ${d}`).join("、")} 在五個區間都排進最少 3 名。`:"沒有尾數在五個區間都排進最少 3 名。"}這幾個區間互相包含（近 10 期也在近 30 期裡），所以常常會看到同一個尾數重複出現，這不代表它下一期比較容易開出。</div></div>`;
+    <p class="note">格子裡是各尾數的實際出現次數。每一列各自排名，藍色是最少的 3 名，藍色越濃越少；一樣冷的尾數同色。排名已校正尾 0 只有 3 個號碼，所以尾 0 次數本來就偏低，不一定會被標藍。</p>
+    <div class="cgrid">${cells}</div>
+    <div class="legend"><span><i style="background:var(--cold)"></i>最少</span><span><i style="background:color-mix(in srgb,var(--cold) 60%,var(--soft))"></i>第 2 少</span><span><i style="background:color-mix(in srgb,var(--cold) 30%,var(--soft))"></i>第 3 少</span></div>
+    <div class="verdict">${all.length?`${all.map(d=>`尾 ${d}`).join("、")} 在五個區間都排進最少 3 名（最上面的尾數標成藍色）。`:"沒有尾數在五個區間都排進最少 3 名。"}這幾個區間互相包含（近 10 期也在近 30 期裡），所以常常會看到同一個尾數重複出現，這不代表它下一期比較容易開出。</div></div>`;
 }
 
 function crossHTML(){
