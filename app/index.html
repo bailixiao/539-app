@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>539 尾數觀察站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>539 尾數觀察站<small>今彩539</small></h1>
+  <div class="meta" id="meta">讀取資料中…</div>
+  <div class="latest" id="latest"></div>
+</header>
+
+<nav class="tabs" role="tablist" id="tabs">
+  <button role="tab" data-t="dist" aria-selected="true">尾數分布</button>
+  <button role="tab" data-t="gap">遺漏期數</button>
+  <button role="tab" data-t="trend">熱冷走勢</button>
+  <button role="tab" data-t="num">單號冷熱</button>
+  <button role="tab" data-t="rep">連莊</button>
+  <button role="tab" data-t="combo">組合特徵</button>
+  <button role="tab" data-t="test">選號回測</button>
+  <button role="tab" data-t="ev">期望值</button>
+  <button role="tab" data-t="data">資料</button>
+</nav>
+
+<main id="view"></main>
+
+<footer>每一期開獎都是獨立事件，過去的統計無法預測下一期。這個頁面只用來觀察數據，不構成投注建議。</footer>
+</div>
+
+<script src="stats.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

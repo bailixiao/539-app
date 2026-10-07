@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "app",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "app", "-p", "5390", "-c-1"],
+      "port": 5390
+    }
+  ]
+}
