@@ -16,7 +16,7 @@
 - reference/539-tail.html：目前已經做好、驗證過的單檔版本。所有統計計算都以它為準，搬到新檔案時邏輯照抄，不要改公式。
 - data/539-draws.csv：2024/1/1 到 2026/10/6 共 872 期開獎號碼，要匯入 Google Sheet 用。
 - app/：PWA 前端（index.html、style.css、app.js、stats.js、manifest.json、sw.js、icons/）
-- gas/Code.gs：Google Apps Script 後端。這個檔案我會自己複製貼到 Apps Script 編輯器。
+- gas/Code.gs：Google Apps Script 後端。用 clasp（Google 官方的 Apps Script 指令工具）上傳：在 gas/ 資料夾執行 `clasp push --force`。gas/.clasp.json 記錄綁定的專案（試算表「539 開獎資料」的「539 開獎資料 後端」）。改完 Code.gs 要 push，影響 doGet/doPost 的改動還要更新部署版本（網址不變）。
 
 ## 工作規則
 1. 一次只做一個階段，或一個小改動。做完停下來，等我驗收再繼續。
