@@ -2,7 +2,7 @@
  * 網頁檔案存一份在手機裡。改了 app 的檔案時，把 VERSION 換掉，舊的快取會自動清掉。
  * 開獎資料不在這裡處理：app.js 自己會把資料存在 localStorage。
  */
-const VERSION = "20261008e";
+const VERSION = "20261008f";
 const CACHE = "t539-" + VERSION;
 const SHELL = [
   "./",
@@ -41,10 +41,10 @@ self.addEventListener("fetch", e => {
   // 開獎資料（Apps Script）不經過快取
   if (url.hostname.endsWith("script.google.com") || url.hostname.endsWith("googleusercontent.com")) return;
 
-  // 打開頁面：先上網拿新版，沒網路就用存的
+  // 打開頁面：先上網拿新版（不用瀏覽器暫存的舊頁），沒網路就用存的
   if (req.mode === "navigate") {
     e.respondWith(
-      fetch(req).then(res => {
+      fetch(req, {cache: "no-cache"}).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put("./index.html", copy));
         return res;

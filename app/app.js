@@ -546,5 +546,12 @@ render();
 loadDraws();
 
 // 離線快取：讓 app 沒網路也打得開
-if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+if("serviceWorker" in navigator){
+  // 已經有舊版小幫手時，新版接手後自動重新載入一次，畫面馬上換成新版
+  let hadOld=!!navigator.serviceWorker.controller, reloaded=false;
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+    if(hadOld && !reloaded){ reloaded=true; location.reload(); }
+  });
+  navigator.serviceWorker.register("sw.js", {updateViaCache: "none"}).then(r=>r.update()).catch(()=>{});
+}
 })();
