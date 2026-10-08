@@ -83,6 +83,23 @@ function numStats(L){
   return {E, arr, chi};
 }
 
+/* ---------- 單號遺漏 ---------- */
+// 每個號碼：目前連續幾期沒開、歷史最長幾期沒開、最後一次開出日期
+// 每期某個號碼開出的機率 = 5/39；平均遺漏 = (1-p)/p ≈ 6.8 期
+const P_NUM = 5/39;
+function numGaps(L){
+  const res=[];
+  for(let v=1; v<=39; v++){
+    let run=0, longest=0, last=null;
+    for(let i=0;i<L.length;i++){
+      if(L[i].n.includes(v)){ longest=Math.max(longest,run); run=0; last=L[i].d; } else run++;
+    }
+    longest=Math.max(longest,run);
+    res.push({v, cur:run, longest, last, prob:Math.pow(1-P_NUM,run)});
+  }
+  return res;
+}
+
 /* ---------- 中幾號 ---------- */
 const PRIZE=[0,0,50,300,20000,8000000];
 const MEM=new WeakMap();

@@ -8,7 +8,7 @@ const LS_KEY = "t539_draws_v2";
 // 底部導覽 4 組，每組上方再用切換鈕換頁
 const GROUPS = {
   tail: [["dist","分布"],["gap","遺漏"],["trend","走勢"],["cross","交叉比對"]],
-  num:  [["num","單號冷熱"],["rep","連莊"],["combo","組合特徵"]],
+  num:  [["num","單號冷熱"],["ngap","單號遺漏"],["rep","連莊"],["combo","組合特徵"]],
   test: [["test","選號回測"],["ev","期望值"]],
   help: [["howto","使用教學"],["faq","常見問題"]],
   data: [["data","資料"]]
@@ -88,7 +88,7 @@ function ballHTML(v){ const s=pad2(v); return `<span class="ball">${s[0]}<b>${s[
 function recent(){ return S.range==="all" ? S.draws : S.draws.slice(-S.range); }
 function fmtTime(t){ const d=new Date(t); return `${d.getMonth()+1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 function rangeHTML(){
-  const opts=[[10,"近 10 期"],[15,"近 15 期"],[20,"近 20 期"],[25,"近 25 期"],[30,"近 30 期"],[100,"近 100 期"],[300,"近 300 期"],["all","全部"]];
+  const opts=[[10,"近 10 期"],[15,"近 15 期"],[20,"近 20 期"],[25,"近 25 期"],[30,"近 30 期"],[100,"近 100 期"],[200,"近 200 期"],[300,"近 300 期"],["all","全部"]];
   return `<div class="range">統計範圍 <select id="rangeSel">${opts.map(([v,t])=>`<option value="${v}" ${String(S.range)===String(v)?"selected":""}>${t}</option>`).join("")}</select></div>`;
 }
 function emptyHTML(){
@@ -224,6 +224,24 @@ function viewNum(){
     <div class="verdict ${ok?"":"warn"}">39 個號碼的卡方值 ${chi.toFixed(1)}（門檻 53.4）。${ok?"冷熱差距在純隨機的範圍內。":"差距超過一般隨機波動，可以檢查資料，或是資料期數太少。"}單號切得比尾數細，每格的樣本更少，所以看起來會比尾數更「冷熱分明」，但那多半是雜訊。</div></div>`;
 }
 
+function viewNgap(){
+  const L=S.draws; if(!L.length) return emptyHTML();
+  const g=numGaps(L).sort((a,b)=>b.cur-a.cur||a.v-b.v);
+  const avg=(1-P_NUM)/P_NUM;
+  const md=s=>s?`${+s.slice(5,7)}/${+s.slice(8,10)}`:"—";
+  const rows=g.map(x=>{
+    const pct=x.prob*100, strong=x.cur>=avg*3;
+    return `<tr><td class="d">${pad2(x.v)}</td><td><span class="n"${strong?' style="color:var(--cold);font-weight:700"':""}>${x.cur}</span></td><td><span class="n">${x.longest}</span></td>
+      <td><span class="n">${md(x.last)}</span></td><td><span class="n">${x.cur?pct.toFixed(pct<1?2:1)+"%":"—"}</span></td></tr>`;
+  }).join("");
+  const top=g[0];
+  return `<div class="panel"><h2>單號遺漏</h2>
+    <p class="note">「遺漏」是每個號碼從最新一期往回算，連續幾期沒開出，最久沒開的排最前面。「最長」是統計全部 ${L.length} 期（從 ${L[0].d} 開始）裡，最久連續幾期沒開。「遺漏機率」是連續這麼多期都沒開的機率。平均每個號碼約 ${avg.toFixed(1)} 期會開出一次，目前遺漏超過 ${Math.round(avg*3)} 期的標成藍色。</p>
+    <div class="scroll"><table><thead><tr><th>號碼</th><th>遺漏</th><th>最長</th><th>最後開出</th><th>遺漏機率</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="verdict">目前最久沒開的是 ${pad2(top.v)}，已經 ${top.cur} 期。單看一個號碼，連續 ${top.cur} 期沒開的機率只有 ${(top.prob*100).toFixed(top.prob<0.01?2:1)}%，但一共有 39 個號碼，總會有某個號碼剛好拖很久，這很常見。不管遺漏多久，每個號碼下一期開出的機率都一樣是 ${(P_NUM*100).toFixed(1)}%，不會因為「很久沒出」而變高。</div>
+    <p class="note">「冷熱」看的是一段期間總共開幾次，「遺漏」看的是最近連續幾期沒開，兩個是不同的數字。例如一個號碼近 100 期開了 10 次，但如果全都集中在前面，最近還是可能很久沒開。</p></div>`;
+}
+
 function viewRep(){
   const L=S.draws; if(L.length<2) return emptyHTML();
   const {ks, n, mean}=repeatStats(L);
@@ -331,8 +349,8 @@ function viewHowto(){
     <h3>尾數 › 遺漏、走勢、交叉比對</h3>
     <p class="note">遺漏：每個尾數幾期沒開了。走勢：近 60 期的熱冷圖。交叉比對：近 30 期和近 100 期都偏少的尾數，標為「雙冷」。</p>
     ${shot("cross.png","交叉比對頁的畫面")}
-    <h3>號碼 › 單號冷熱、連莊、組合特徵</h3>
-    <p class="note">39 個號碼各開幾次（越紅越熱、越藍越冷）、每期跟上期重複幾個、和值與奇偶大小比例。</p>
+    <h3>號碼 › 單號冷熱、單號遺漏、連莊、組合特徵</h3>
+    <p class="note">39 個號碼各開幾次（越紅越熱、越藍越冷）、每個號碼已經幾期沒開、每期跟上期重複幾個、和值與奇偶大小比例。</p>
     ${shot("num.png","單號冷熱頁的畫面")}
     <h3>回測 › 選號回測、期望值</h3>
     <p class="note">用過去的資料試 7 種選號方法，看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。</p>
@@ -359,6 +377,7 @@ const FAQ = [
   ["打開後一直顯示「讀取資料中」或「更新中…」？", `資料放在 Google 的伺服器，閒置一陣子後第一次讀取比較慢，大約要等 5 秒。如果超過 30 秒，請確認網路，再往下拉重新整理。`],
   ["畫面跟別人的不一樣、新功能沒出現？", `app 更新後，手機可能還在用舊版。把 app 完全關掉（從背景滑掉）再打開一次，就會換成新版。`],
   ["iPhone 找不到「加入主畫面」？", `要用 Safari 打開才有這個選項。從 LINE 點開的話，先按 LINE 畫面右上或右下角的選單，選「用 Safari 開啟」或「用預設瀏覽器開啟」，再按分享鈕。`],
+  ["「冷熱」和「遺漏」有什麼不同？", `冷熱看的是一段期間「總共開幾次」，遺漏看的是從最新一期往回數「連續幾期沒開」。例如某個號碼近 100 期開了 10 次，但如果都集中在前面，最近可能已經 40 幾期沒開。「號碼 › 單號遺漏」看每個號碼，「尾數 › 遺漏」看每個尾數。`],
   ["為什麼尾 0 的次數特別少？", `尾 0 只有 10、20、30 三個號碼，其他尾數都有 4 個（例如尾 1 是 1、11、21、31），所以尾 0 本來就比較少出現。app 裡的排名和「雙冷」都已經校正過這一點。`],
   ["「卡方值」是什麼？", `用來判斷「實際次數跟理論值的差距，是不是運氣就能解釋」。低於門檻（尾數 16.9、單號 53.4）代表差距在正常範圍內，純屬運氣。`],
   ["「z 分數」和「雙冷」是什麼？", `z 分數 = 跟理論值差多少 ÷ 正常會晃動的幅度。z 在 ±2 以內算正常晃動。「雙冷」是近 30 期和近 100 期都排在最冷 3 名的尾數。因為近 30 期本來就包含在近 100 期裡，雙冷不代表下一期比較會開。`],
@@ -458,7 +477,7 @@ function render(){
   $("#tabs").hidden=subs.length<2;
   $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
   document.querySelectorAll("#bnav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.g===S.group));
-  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
+  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,ngap:viewNgap,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
   $("#view").innerHTML=v;
   const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
   const ep=$("#evPer"); if(ep) ep.onchange=e=>{ S.evPer=+e.target.value; render(); };
