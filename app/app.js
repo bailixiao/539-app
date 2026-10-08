@@ -10,8 +10,10 @@ const GROUPS = {
   tail: [["dist","分布"],["gap","遺漏"],["trend","走勢"],["cross","交叉比對"]],
   num:  [["num","單號冷熱"],["rep","連莊"],["combo","組合特徵"]],
   test: [["test","選號回測"],["ev","期望值"]],
+  help: [["howto","使用教學"],["faq","常見問題"]],
   data: [["data","資料"]]
 };
+const APP_URL = "https://bailixiao.github.io/539-app/app/";
 const NAV_KEY = "t539_nav";
 const ADMIN_KEY = "t539_admin";  // 管理者密碼只存在這支手機，按「登出」就清掉
 
@@ -283,6 +285,94 @@ function viewEV(){
   return html;
 }
 
+/* ---------- 說明：使用教學、常見問題 ---------- */
+const ICON_SHARE = `<svg class="ico" viewBox="0 0 24 24" aria-label="分享鈕"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M6 11H5v10h14V11h-1"/></svg>`;
+const ICON_ADD = `<svg class="ico" viewBox="0 0 24 24" aria-label="加入主畫面圖示"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg>`;
+const ICON_MORE = `<svg class="ico" viewBox="0 0 24 24" aria-label="選單鈕"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>`;
+const goBtn = (g,t,label) => `<button class="btn ghost" data-go="${g}:${t}">${label}</button>`;
+const shot = (src,alt) => `<img class="shot" src="help/${src}" alt="${alt}" loading="lazy">`;
+
+function viewHowto(){
+  return `<div class="panel"><h2>1. 打開 app</h2>
+    <p class="note">用手機瀏覽器打開下面的網址，或用相機掃 QR code。不用註冊、不用登入。</p>
+    <p class="url">${APP_URL}</p>
+    <img class="qr" src="help/qrcode.png" alt="app 網址的 QR code" loading="lazy"></div>
+
+  <div class="panel"><h2>2. 加到主畫面（變成 app）</h2>
+    <p class="note">加到主畫面後，就像一般 app 一樣從圖示打開，全螢幕、沒網路也打得開。</p>
+    <h3>iPhone（一定要用 Safari）</h3>
+    <ol class="steps">
+      <li>用 <b>Safari</b> 打開網址（從 LINE 點開的話，先按右上或右下角的選單，選「用 Safari 開啟」或「用預設瀏覽器開啟」）</li>
+      <li>按畫面下方的分享鈕 ${ICON_SHARE}</li>
+      <li>往下滑，按「加入主畫面」${ICON_ADD}</li>
+      <li>右上角按「加入」</li>
+    </ol>
+    <h3>Android（用 Chrome）</h3>
+    <ol class="steps">
+      <li>用 <b>Chrome</b> 打開網址</li>
+      <li>按右上角的 ${ICON_MORE}</li>
+      <li>按「安裝應用程式」或「加到主畫面」</li>
+      <li>按「安裝」或「新增」</li>
+    </ol>
+    <p class="note">完成後，主畫面會出現深色底、寫著「539」的圖示。</p></div>
+
+  <div class="panel"><h2>3. 畫面怎麼看</h2>
+    <ol class="steps">
+      <li>最上面是「資料更新到哪一天」和最新一期的 5 個號碼</li>
+      <li>最下面有 4 個鍵：<b>尾數、號碼、回測、說明</b></li>
+      <li>每個鍵按下去，上方還有小按鈕可以切換頁面</li>
+      <li>有些頁面可以選「統計範圍」，例如近 30 期、近 100 期</li>
+    </ol>
+    ${shot("home.png","尾數分布頁的畫面")}</div>
+
+  <div class="panel"><h2>4. 各頁在看什麼</h2>
+    <h3>尾數 › 分布</h3>
+    <p class="note">0–9 每個尾數開出幾次，黑線是理論上該有的次數。下面的方格表列出近 10–30 期最少出的尾數。</p>
+    <h3>尾數 › 遺漏、走勢、交叉比對</h3>
+    <p class="note">遺漏：每個尾數幾期沒開了。走勢：近 60 期的熱冷圖。交叉比對：近 30 期和近 100 期都偏少的尾數，標為「雙冷」。</p>
+    ${shot("cross.png","交叉比對頁的畫面")}
+    <h3>號碼 › 單號冷熱、連莊、組合特徵</h3>
+    <p class="note">39 個號碼各開幾次（越紅越熱、越藍越冷）、每期跟上期重複幾個、和值與奇偶大小比例。</p>
+    ${shot("num.png","單號冷熱頁的畫面")}
+    <h3>回測 › 選號回測、期望值</h3>
+    <p class="note">用過去的資料試 7 種選號方法，看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。</p>
+    ${shot("ev.png","期望值頁的畫面")}
+    <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("test","test","去看回測")}</div></div>
+
+  <div class="panel"><h2>5. 資料更新</h2>
+    <ol class="steps">
+      <li>每週一到週六晚上 9–10 點自動更新，不用做任何事</li>
+      <li>想馬上看最新資料：在畫面最上面<b>往下拉再放開</b></li>
+      <li>頂端出現紅色提醒，代表好幾天沒更新，告訴管理者就好</li>
+      <li>沒網路時也打得開，頂端會標「離線資料」，顯示上次的資料</li>
+    </ol></div>
+
+  <div class="panel"><div class="verdict warn">每一期開獎都是獨立事件，過去的統計無法預測下一期。這個 app 只用來觀察數據，不能提高中獎率。</div></div>`;
+}
+
+const FAQ = [
+  ["這個 app 可以幫我選號、提高中獎率嗎？", `不行。每一期開獎都是獨立的，上一期開什麼不會影響下一期。「回測」頁用過去 700 多期實際試過 7 種選號方法，結果都跟亂選差不多。這個 app 是用來看數據、了解機率，不是選號工具。`],
+  ["冷門的尾數或號碼，下一期比較容易開嗎？", `不會。就算某個尾數很久沒開，下一期開出的機率還是一樣（尾 0 約 34.5%，其他尾數約 43.6%）。「很久沒出所以快出了」是很常見的錯覺。`],
+  ["資料多久更新？今天的號碼什麼時候會出現？", `每週一到週六晚上 9–10 點自動抓號，通常晚上 10 點後就看得到當天號碼。在畫面最上面往下拉再放開，可以馬上重新讀取。`],
+  ["頂端出現紅色提醒是什麼意思？", `代表已經有 2 個以上的開獎日沒有新資料，可能是自動抓號出了問題。統計還是可以看，只是少了最近幾期。告訴管理者處理就好。過年停開期間也會出現這個提醒，屬於正常。`],
+  ["頂端寫「離線資料」是什麼意思？", `手機現在連不上網路，顯示的是上次存在手機裡的資料。連上網路後往下拉重新整理就會更新。`],
+  ["打開後一直顯示「讀取資料中」或「更新中…」？", `資料放在 Google 的伺服器，閒置一陣子後第一次讀取比較慢，大約要等 5 秒。如果超過 30 秒，請確認網路，再往下拉重新整理。`],
+  ["畫面跟別人的不一樣、新功能沒出現？", `app 更新後，手機可能還在用舊版。把 app 完全關掉（從背景滑掉）再打開一次，就會換成新版。`],
+  ["iPhone 找不到「加入主畫面」？", `要用 Safari 打開才有這個選項。從 LINE 點開的話，先按 LINE 畫面右上或右下角的選單，選「用 Safari 開啟」或「用預設瀏覽器開啟」，再按分享鈕。`],
+  ["為什麼尾 0 的次數特別少？", `尾 0 只有 10、20、30 三個號碼，其他尾數都有 4 個（例如尾 1 是 1、11、21、31），所以尾 0 本來就比較少出現。app 裡的排名和「雙冷」都已經校正過這一點。`],
+  ["「卡方值」是什麼？", `用來判斷「實際次數跟理論值的差距，是不是運氣就能解釋」。低於門檻（尾數 16.9、單號 53.4）代表差距在正常範圍內，純屬運氣。`],
+  ["「z 分數」和「雙冷」是什麼？", `z 分數 = 跟理論值差多少 ÷ 正常會晃動的幅度。z 在 ±2 以內算正常晃動。「雙冷」是近 30 期和近 100 期都排在最冷 3 名的尾數。因為近 30 期本來就包含在近 100 期裡，雙冷不代表下一期比較會開。`],
+  ["「期望值 27.92 元」是什麼意思？", `每注 50 元，長期平均只能拿回大約 27.92 元（稅前），也就是每買 100 元平均虧掉約 44 元。這是彩券的設計，不管怎麼選號都一樣。`],
+  ["要登入嗎？會收集我的資料嗎？", `不用登入，也不會收集任何個人資料。手機裡只會存開獎號碼和你上次看的頁面，方便下次打開。`],
+  ["發現號碼錯了怎麼辦？", `截圖告訴管理者。管理者可以刪除錯誤的期數，或匯入台灣彩券官方的資料來更正。這個 app 不提供手動輸入號碼，避免打錯。`],
+  ["怎麼分享給別人？", `把網址 ${APP_URL} 傳給對方，或讓對方掃「使用教學」裡的 QR code。`],
+];
+function viewFaq(){
+  return `<div class="panel"><h2>常見問題</h2><p class="note">點問題就會展開答案。</p>
+    <div class="faq">${FAQ.map(([q,a])=>`<details><summary>${q}</summary><p>${a}</p></details>`).join("")}</div>
+    <div class="btns">${goBtn("help","howto","看使用教學")}</div></div>`;
+}
+
 function msgHTML(){ return S.msg ? `<p class="msg ${S.msgErr?"err":""}">${S.msg}</p>` : ""; }
 
 function viewLogin(){
@@ -368,7 +458,7 @@ function render(){
   $("#tabs").hidden=subs.length<2;
   $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
   document.querySelectorAll("#bnav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.g===S.group));
-  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,data:viewData}[S.tab]();
+  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
   $("#view").innerHTML=v;
   const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
   const ep=$("#evPer"); if(ep) ep.onchange=e=>{ S.evPer=+e.target.value; render(); };
@@ -410,6 +500,7 @@ async function onLogin(e){
 document.addEventListener("click", async e=>{
   const g=e.target.closest("#bnav button"); if(g){ S.msg=""; go(g.dataset.g); return; }
   const tab=e.target.closest("#tabs button"); if(tab){ go(S.group, tab.dataset.t); return; }
+  const gb=e.target.closest("[data-go]"); if(gb){ const [g,t]=gb.dataset.go.split(":"); go(g,t); return; }
   const del=e.target.closest("[data-del]");
   if(del){ const d=del.dataset.del; if(confirm(`確定刪除 ${d} 這一期？`)) await runAdmin({action:"delete", date:d}); return; }
   const a=e.target.closest("[data-act]"); if(!a) return;
@@ -447,6 +538,9 @@ document.addEventListener("touchend", async ()=>{
 });
 
 loadNav();
+// 網址後面加 #分頁名稱（例如 #cross、#faq）可以直接打開那一頁
+const hashTab=location.hash.slice(1);
+for(const g in GROUPS) if(g!=="data" && GROUPS[g].some(([t])=>t===hashTab)){ S.group=g; S.tab=hashTab; }
 if(S.group==="data" && !S.admin){ S.group="tail"; S.tab=GROUPS.tail[0][0]; }
 render();
 loadDraws();

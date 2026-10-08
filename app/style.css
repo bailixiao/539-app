@@ -114,5 +114,15 @@ html,body{overscroll-behavior-y:contain}
 .link{background:none;border:none;padding:8px 0;color:var(--muted);font:inherit;text-decoration:underline;cursor:pointer}
 input[type=password]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
 .x:disabled{opacity:.4}
+h3{font-size:17px;margin:16px 0 4px}
+.steps{margin:8px 0 0;padding-left:1.4em}
+.steps li{margin:6px 0;line-height:1.6}
+.ico{width:22px;height:22px;vertical-align:-5px;margin:0 2px;fill:none;stroke:var(--cold);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.url{font:600 15px var(--num);word-break:break-all;background:var(--soft);border-radius:8px;padding:8px 10px;margin:10px 0 0;user-select:all}
+.qr{display:block;width:180px;height:180px;margin:12px auto 0;background:#fff;border-radius:8px}
+.shot{display:block;width:100%;max-width:280px;margin:12px auto 4px;border:1px solid var(--line);border-radius:14px}
+.faq details{border-bottom:1px solid var(--line);padding:4px 0}
+.faq summary{cursor:pointer;font-weight:500;padding:8px 0;list-style-position:outside;margin-left:1.1em}
+.faq details p{margin:0 0 10px 1.1em;color:var(--muted)}
 .meta .src{margin-left:6px}
 .meta .src.off{color:var(--hot)}
