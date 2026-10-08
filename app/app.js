@@ -193,7 +193,7 @@ function viewTest(){
   const t=S.test;
   html+=`<div class="panel"><h2>策略回測</h2>
     <p class="note">每一期只用「那一期之前」的資料選 5 個號碼，再對當期開獎，從第 101 期一路跑到最新一期。</p>
-    <p class="note">追熱尾／追冷尾：前 20 期最熱／最冷的 5 個尾數各挑 1 號。雙冷尾：近 30 × 近 100 交叉比對最冷的 5 個尾數。追熱號／追冷號：前 30 期出現最多／最少的 5 個號碼。連莊：直接買上一期的 5 個號碼。隨機：亂數。</p>`;
+    <p class="note">追熱尾／追冷尾：前 20 期最熱／最冷的 5 個尾數各挑 1 號。雙冷尾：近 30 × 近 100 交叉比對最冷的 5 個尾數。追熱號／追冷號：前 30 期出現最多／最少的 5 個號碼。追遺漏號：當時最久沒開的 5 個號碼。連莊：直接買上一期的 5 個號碼。隨機：亂數。</p>`;
   if(!t){ html+=`<div class="btns"><button class="btn" data-act="test">開始回測</button></div></div>`; return html; }
   if(t==="few"){ html+=`<p class="msg err">資料至少要 130 期才能回測。</p></div>`; return html; }
   const row=(name,s)=>`<tr><td>${name}</td><td><span class="n">${(s.h/t.n).toFixed(3)}</span></td><td><span class="n">${(s.h2/t.n*100).toFixed(1)}%</span></td><td><span class="n">${(s.h3/t.n*100).toFixed(2)}%</span></td><td><span class="n">${(s.pay/(t.n*50)*100).toFixed(0)}%</span></td></tr>`;
@@ -228,14 +228,22 @@ function viewNgap(){
   const L=S.draws; if(!L.length) return emptyHTML();
   const g=numGaps(L).sort((a,b)=>b.cur-a.cur||a.v-b.v);
   const avg=(1-P_NUM)/P_NUM;
+  // 尾數遺漏：超過該尾數平均遺漏 3 倍算「尾數也很久沒開」（尾 0 平均約 1.9 期，其他約 1.3 期）
+  const tg=gaps(L), tailLong=d=>tg[d].cur>=3*(1-tg[d].p)/tg[d].p;
+  const both=x=>x.cur>=avg*3 && tailLong(x.v%10);
   const md=s=>s?`${+s.slice(5,7)}/${+s.slice(8,10)}`:"—";
   const rows=g.map(x=>{
     const pct=x.prob*100, strong=x.cur>=avg*3;
-    return `<tr><td class="d">${pad2(x.v)}</td><td><span class="n"${strong?' style="color:var(--cold);font-weight:700"':""}>${x.cur}</span></td><td><span class="n">${x.longest}</span></td>
+    return `<tr><td class="d">${pad2(x.v)}${both(x)?'<span class="tag" style="background:var(--cold);color:#fff">雙遺漏</span>':""}</td><td><span class="n"${strong?' style="color:var(--cold);font-weight:700"':""}>${x.cur}</span></td><td><span class="n">${x.longest}</span></td>
       <td><span class="n">${md(x.last)}</span></td><td><span class="n">${x.cur?pct.toFixed(pct<1?2:1)+"%":"—"}</span></td></tr>`;
   }).join("");
-  const top=g[0];
-  return `<div class="panel"><h2>單號遺漏</h2>
+  const top=g[0], dual=g.filter(both);
+  const tailLine=tg.map(t=>`<span style="white-space:nowrap${tailLong(t.d)?";color:var(--cold);font-weight:700":""}">尾 ${t.d}：${t.cur}</span>`).join("、");
+  const crossPanel=`<div class="panel"><h2>號碼 × 尾數 遺漏比對</h2>
+    <p class="note">把「單號遺漏」和「尾數遺漏」放在一起看：號碼本身超過 ${Math.round(avg*3)} 期沒開，而且它的尾數也超過平均 3 倍沒開（尾 0 是 6 期以上，其他尾數 4 期以上），標為「雙遺漏」。</p>
+    <p class="note">各尾數目前遺漏（期）：${tailLine}</p>
+    <div class="verdict">${dual.length?`目前雙遺漏：${dual.map(x=>`${pad2(x.v)}（${x.cur} 期，尾 ${x.v%10} 已 ${tg[x.v%10].cur} 期）`).join("、")}。`:`目前沒有雙遺漏的號碼。最久沒開的 ${pad2(top.v)}，它的尾 ${top.v%10} 最近 ${tg[top.v%10].cur} 期內有開過（同尾數的其他號碼有開）。`}這只是觀察：號碼和尾數遺漏多久，下一期開出的機率都不變。「追遺漏號」到底有沒有用，可以到「選號回測」看實際結果。</div></div>`;
+  return crossPanel+`<div class="panel"><h2>單號遺漏</h2>
     <p class="note">「遺漏」是每個號碼從最新一期往回算，連續幾期沒開出，最久沒開的排最前面。「最長」是統計全部 ${L.length} 期（從 ${L[0].d} 開始）裡，最久連續幾期沒開。「遺漏機率」是連續這麼多期都沒開的機率。平均每個號碼約 ${avg.toFixed(1)} 期會開出一次，目前遺漏超過 ${Math.round(avg*3)} 期的標成藍色。</p>
     <div class="scroll"><table><thead><tr><th>號碼</th><th>遺漏</th><th>最長</th><th>最後開出</th><th>遺漏機率</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="verdict">目前最久沒開的是 ${pad2(top.v)}，已經 ${top.cur} 期。單看一個號碼，連續 ${top.cur} 期沒開的機率只有 ${(top.prob*100).toFixed(top.prob<0.01?2:1)}%，但一共有 39 個號碼，總會有某個號碼剛好拖很久，這很常見。不管遺漏多久，每個號碼下一期開出的機率都一樣是 ${(P_NUM*100).toFixed(1)}%，不會因為「很久沒出」而變高。</div>

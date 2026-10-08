@@ -107,12 +107,15 @@ function mset(x){ let m=MEM.get(x); if(!m){ m=new Uint8Array(40); x.n.forEach(v=
 function hits(pick,x){ const m=mset(x); let h=0; for(const v of pick) h+=m[v]; return h; }
 
 /* ---------- 選號回測 ---------- */
-const STRATS=[["hotT","追熱尾"],["coldT","追冷尾"],["dualT","雙冷尾"],["hotN","追熱號"],["coldN","追冷號"],["rep","連莊"],["rand","隨機"]];
+const STRATS=[["hotT","追熱尾"],["coldT","追冷尾"],["dualT","雙冷尾"],["hotN","追熱號"],["coldN","追冷號"],["gapN","追遺漏號"],["rep","連莊"],["rand","隨機"]];
 function backtest(L){
   const W=20, r=rng(539);
   if(L.length < 130) return null;
   const st={}; STRATS.forEach(([k])=>st[k]={h:0,h2:0,h3:0,pay:0}); let n=0;
   const pickFrom=tails=>tails.map(d=>{const ns=numsOfTail(d); return ns[Math.floor(r()*ns.length)];});
+  // 追遺漏號（2026/10/8 新增）：用自己的亂數排同分，才不會改到原本 7 種策略的結果
+  const r2=rng(5390), lastIdx=Array(40).fill(-1);
+  for(let i=0;i<100;i++) L[i].n.forEach(v=>lastIdx[v]=i);
   for(let i=100;i<L.length;i++){
     const c=tailCounts(L.slice(i-W,i)).map((v,d)=>({d,v:v/K(d),t:r()}));
     const order=c.slice().sort((a,b)=>b.v-a.v||a.t-b.t).map(o=>o.d);
@@ -123,7 +126,10 @@ function backtest(L){
     nOrder.sort((a,b)=>b.c-a.c||a.t-b.t);
     const picks={hotT:pickFrom(order.slice(0,5)), coldT:pickFrom(order.slice(5)), dualT:pickFrom(dualOrder.slice(0,5)),
       hotN:nOrder.slice(0,5).map(o=>o.v), coldN:nOrder.slice(-5).map(o=>o.v), rep:L[i-1].n.slice(), rand:sample5(r)};
+    const gOrder=[]; for(let v=1;v<=39;v++) gOrder.push({v,g:i-1-lastIdx[v],t:r2()});
+    picks.gapN=gOrder.sort((a,b)=>b.g-a.g||a.t-b.t).slice(0,5).map(o=>o.v);
     for(const k in picks){ const h=hits(picks[k],L[i]); st[k].h+=h; st[k].pay+=PRIZE[h]; if(h>=2)st[k].h2++; if(h>=3)st[k].h3++; }
+    L[i].n.forEach(v=>lastIdx[v]=i);
     n++;
   }
   return {n, st};
