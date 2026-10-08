@@ -27,3 +27,4 @@
 6. 每完成一個段落就 commit 並 push 到 GitHub（儲存庫 539-app），commit 訊息用中文寫清楚改了什麼。
 7. 儲存庫是公開的：不能放密碼、金鑰、個資。2024、2025、2026 資料夾的原始 CSV 不上傳。
 8. 改了 app/ 的任何檔案，要同時換新版本號（日期+英文字母，例如 20261008b）：index.html 裡 css/js 的 ?v=，和 sw.js 的 VERSION，三處要一樣。不然手機會卡在舊檔。
+9. 新增或修改功能時，說明要同步更新，跟功能一起上線：app 裡「說明」的使用教學和常見問題（app.js 的 viewHowto、FAQ）、docs/親友SOP.txt；跟管理有關的改 docs/管理者SOP.md；畫面有變就重截 app/help/ 的截圖（tools/help-screenshots.js，用法寫在檔案開頭）；計畫書的功能規格或已決定事項也要記上。

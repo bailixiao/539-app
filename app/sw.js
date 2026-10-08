@@ -2,7 +2,7 @@
  * 網頁檔案存一份在手機裡。改了 app 的檔案時，把 VERSION 換掉，舊的快取會自動清掉。
  * 開獎資料不在這裡處理：app.js 自己會把資料存在 localStorage。
  */
-const VERSION = "20261008i";
+const VERSION = "20261008j";
 const CACHE = "t539-" + VERSION;
 const SHELL = [
   "./",

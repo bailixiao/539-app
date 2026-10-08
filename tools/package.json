@@ -1,0 +1,6 @@
+{
+  "name": "t539-tools",
+  "private": true,
+  "description": "539 尾數觀察站的輔助工具（重截說明頁截圖）",
+  "dependencies": { "puppeteer-core": "^23.0.0" }
+}
