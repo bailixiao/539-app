@@ -135,6 +135,103 @@ function backtest(L){
   return {n, st};
 }
 
+/* ---------- 6 中 3 訊號（2026/10/11 新增，照「樂透統計學」影片概念實作，用來驗證） ----------
+ * 三球組合：39 取 3 共 9,139 組；某期開出其中 2 個以上 = 「3 中 2 命中」。
+ * 間距穩定：近 W 期至少命中 4 次，間隔的「標準差 ÷ 平均」(cv) 越小越規律。
+ * 目前在低點：K 值 < 20，且距上次命中已達平均間隔的 0.8–1.2 倍（影片說的「支撐位」）。
+ * K 值：命中那期 RSV = 100、沒中 = 0，K = 2/3 × 前一期 K + 1/3 × RSV；D = 2/3 × 前一期 D + 1/3 × K。
+ * 配對：符合條件、cv 最小的前 30 組裡，挑兩組號碼不重複、cv 合計最小的，合成 6 個號碼。
+ */
+const SIG_W = 150, SIG_TOP = 30;
+const P_6IN3 = 11061/575757;   // 隨機 6 個號碼，一期開出其中 3 個以上的機率
+const P_3IN2 = 22050/575757;   // 隨機 3 個號碼，一期開出其中 2 個以上的機率
+let TRI = null;
+function tripleIndex(){
+  if(TRI) return TRI;
+  const key=new Int16Array(40*40*40).fill(-1), list=[];
+  for(let a=1;a<=37;a++)for(let b=a+1;b<=38;b++)for(let c=b+1;c<=39;c++){ key[a*1600+b*40+c]=list.length; list.push([a,b,c]); }
+  return TRI={key, list};
+}
+const TRI_HITS = new WeakMap();
+// 每個三球組合「3 中 2 命中」的期別索引（由舊到新）
+function tripleHits(L){
+  let h=TRI_HITS.get(L); if(h) return h;
+  const {key, list}=tripleIndex();
+  h=list.map(()=>[]);
+  L.forEach((x,i)=>{
+    const n=x.n, seen=new Set();
+    for(let p=0;p<5;p++)for(let q=p+1;q<5;q++)for(let c=1;c<=39;c++){
+      if(c===n[p]||c===n[q]) continue;
+      const t=[n[p],n[q],c].sort((u,v)=>u-v), id=key[t[0]*1600+t[1]*40+t[2]];
+      if(!seen.has(id)){ seen.add(id); h[id].push(i); }
+    }
+  });
+  TRI_HITS.set(L,h);
+  return h;
+}
+function lowerBound(a,v){ let lo=0,hi=a.length; while(lo<hi){ const m=(lo+hi)>>1; if(a[m]<v) lo=m+1; else hi=m; } return lo; }
+// 站在第 i 期開獎前（只用 i 之前的資料）評估一組三球
+function evalTriple(h, i){
+  const lo=lowerBound(h,i-SIG_W), hi=lowerBound(h,i), m=hi-lo;
+  if(m<4) return null;
+  let s=0, s2=0;
+  for(let k=lo+1;k<hi;k++){ const d=h[k]-h[k-1]; s+=d; s2+=d*d; }
+  const n=m-1, mean=s/n, sd=Math.sqrt(Math.max(s2/n-mean*mean,0));
+  const g=i-1-h[hi-1];
+  let K=0; for(let k=hi-1;k>=0 && i-1-h[k]<40;k--) K+=100/3*Math.pow(2/3,i-1-h[k]);
+  return {m, mean, cv:sd/mean, g, K:Math.min(K,100)};
+}
+// 第 i 期的訊號：回傳 {a, b, six} 或 null（沒有符合條件的組合）
+function signalAt(L, i){
+  const {list}=tripleIndex(), H=tripleHits(L), cand=[];
+  for(let id=0;id<list.length;id++){
+    const e=evalTriple(H[id], i);
+    if(e && e.K<20 && e.g>=0.8*e.mean && e.g<=1.2*e.mean) cand.push({id, t:list[id], ...e});
+  }
+  cand.sort((x,y)=>x.cv-y.cv||y.m-x.m||x.id-y.id);
+  const top=cand.slice(0,SIG_TOP);
+  let best=null;
+  for(let p=0;p<top.length;p++)for(let q=p+1;q<top.length;q++){
+    if(top[p].t.some(v=>top[q].t.includes(v))) continue;
+    const sc=top[p].cv+top[q].cv;
+    if(!best || sc<best.sc) best={sc, a:top[p], b:top[q]};
+  }
+  if(!best) return null;
+  return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length};
+}
+// 6 個號碼包牌（6 注、300 元）：中 k 個時，k 注中 k-1 個、6-k 注中 k 個
+const pay6 = k => k*(k>0?PRIZE[k-1]:0) + (6-k)*(k<6?PRIZE[Math.min(k,5)]:0);
+// 回測：從第 SIG_W+1 期起，每期只用之前的資料產生訊號，再對當期開獎；同時跟隨機 6 個號碼比
+// 寫成 generator：每算完一期就交回控制權，畫面可以顯示進度、不會卡住
+function* backtest6Steps(L){
+  if(L.length < SIG_W+30) return null;
+  const r=rng(6363), res={sig:{n:0,h:0,six:0,a32:0,pay:0}, rand:{n:0,h:0,six:0,pay:0}, none:0};
+  for(let i=SIG_W;i<L.length;i++){
+    yield (i-SIG_W)/(L.length-SIG_W);
+    const m=mset(L[i]);
+    const rp=[]; while(rp.length<6){ const v=1+Math.floor(r()*39); if(!rp.includes(v)) rp.push(v); }
+    const kr=rp.reduce((s,v)=>s+m[v],0);
+    res.rand.n++; res.rand.h+=kr; if(kr>=3) res.rand.six++; res.rand.pay+=pay6(kr);
+    const s=signalAt(L,i);
+    if(!s){ res.none++; continue; }
+    const k=s.six.reduce((t,v)=>t+m[v],0);
+    res.sig.n++; res.sig.h+=k; if(k>=3) res.sig.six++; res.sig.pay+=pay6(k);
+    for(const g of [s.a.t, s.b.t]) if(g.reduce((t,v)=>t+m[v],0)>=2) res.sig.a32++;
+  }
+  return res;
+}
+function backtest6(L){ const it=backtest6Steps(L); let s; do{ s=it.next(); }while(!s.done); return s.value; }
+// 畫圖用：某組號碼（3 個或 6 個）近 n 期的命中、遺漏、K、D 序列；need = 幾個以上算命中
+function hitSeries(L, nums, need, n){
+  const out=[]; let K=0, D=0, gap=0;
+  for(let i=0;i<L.length;i++){
+    const m=mset(L[i]), hit=nums.reduce((t,v)=>t+m[v],0)>=need;
+    K=2/3*K+1/3*(hit?100:0); D=2/3*D+1/3*K; gap=hit?0:gap+1;
+    if(i>=L.length-n) out.push({d:L[i].d, hit, gap, K, D});
+  }
+  return out;
+}
+
 /* ---------- 連莊 ---------- */
 const REP_THEO=[278256,231880,59840,5610,170,1].map(c=>c/575757);
 function repeatStats(L){

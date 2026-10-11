@@ -24,3 +24,7 @@ node_modules/
 
 # Claude Code 本機設定
 .claude/settings.local.json
+
+# 參考用影片（不上傳）
+*.mp4
+*.mov

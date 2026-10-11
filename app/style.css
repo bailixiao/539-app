@@ -124,5 +124,10 @@ h3{font-size:17px;margin:16px 0 4px}
 .faq details{border-bottom:1px solid var(--line);padding:4px 0}
 .faq summary{cursor:pointer;font-weight:500;padding:8px 0;list-style-position:outside;margin-left:1.1em}
 .faq details p{margin:0 0 10px 1.1em;color:var(--muted)}
+.sixb{justify-content:center;margin:10px 0 4px}
+.sigc{display:block;width:100%;height:auto;margin-top:12px;background:var(--soft);border-radius:8px}
+.sigc .lab{font:500 9px var(--txt);fill:var(--muted)}
+.sigc .ax{stroke:var(--line);stroke-width:1}
+.sigc .dash{stroke-dasharray:3 3}
 .meta .src{margin-left:6px}
 .meta .src.off{color:var(--hot)}

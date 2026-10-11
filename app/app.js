@@ -9,7 +9,7 @@ const LS_KEY = "t539_draws_v2";
 const GROUPS = {
   tail: [["dist","分布"],["gap","遺漏"],["trend","走勢"],["cross","交叉比對"]],
   num:  [["num","單號冷熱"],["ngap","單號遺漏"],["rep","連莊"],["combo","組合特徵"]],
-  test: [["test","選號回測"],["ev","期望值"]],
+  test: [["test","選號回測"],["ev","期望值"],["sig","6中3訊號"]],
   help: [["howto","使用教學"],["faq","常見問題"]],
   data: [["data","資料"]]
 };
@@ -53,7 +53,9 @@ async function fetchLatest(){
   }catch(e){
     S.source = S.draws.length ? "cache" : "error";
   }
-  S.test = null; S.ev = null; render();
+  S.test = null; S.ev = null; S.sig = null;
+  if(typeof S.sigTest!=="number") S.sigTest = null;
+  render();
 }
 
 // 管理者動作：送到 Apps Script 的 doPost。用 text/plain 送，瀏覽器才不會多做一次跨網域檢查
@@ -360,8 +362,8 @@ function viewHowto(){
     <h3>號碼 › 單號冷熱、單號遺漏、連莊、組合特徵</h3>
     <p class="note">39 個號碼各開幾次（越紅越熱、越藍越冷）、每個號碼已經幾期沒開、每期跟上期重複幾個、和值與奇偶大小比例。「單號遺漏」最上面會比對號碼和尾數的遺漏，兩個都很久沒開的號碼標為「雙遺漏」。</p>
     ${shot("num.png","單號冷熱頁的畫面")}
-    <h3>回測 › 選號回測、期望值</h3>
-    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。</p>
+    <h3>回測 › 選號回測、期望值、6中3訊號</h3>
+    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼，並用過去 700 多期回測它有沒有用。</p>
     ${shot("ev.png","期望值頁的畫面")}
     <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("test","test","去看回測")}</div></div>
 
@@ -387,6 +389,7 @@ const FAQ = [
   ["iPhone 找不到「加入主畫面」？", `要用 Safari 打開才有這個選項。從 LINE 點開的話，先按 LINE 畫面右上或右下角的選單，選「用 Safari 開啟」或「用預設瀏覽器開啟」，再按分享鈕。`],
   ["「冷熱」和「遺漏」有什麼不同？", `冷熱看的是一段期間「總共開幾次」，遺漏看的是從最新一期往回數「連續幾期沒開」。例如某個號碼近 100 期開了 10 次，但如果都集中在前面，最近可能已經 40 幾期沒開。「號碼 › 單號遺漏」看每個號碼，「尾數 › 遺漏」看每個尾數。`],
   ["「雙遺漏」是什麼？要特別買嗎？", `號碼本身超過 20 期沒開，而且它的尾數也超過平均 3 倍沒開（尾 0 是 6 期以上，其他尾數 4 期以上），就標為「雙遺漏」。這只是觀察，不代表比較會開。「回測」裡的「追遺漏號」策略就是每期買最久沒開的 5 個號碼，用過去 700 多期實際跑的結果，跟亂選差不多。`],
+  ["「6中3訊號」準嗎？可以照著買嗎？", `不準。這一頁是把網路影片「用 KD 線找支撐位反彈」的方法照做一遍，再用過去 700 多期實際回測：它開出 6 中 3 的機率跟隨機挑 6 個號碼差不多。KD 是股票的技術指標，樂透每期獨立抽球，沒有趨勢可言。隨便挑 6 個號碼，平均每 52 期本來就會遇到一次 6 中 3。`],
   ["為什麼尾 0 的次數特別少？", `尾 0 只有 10、20、30 三個號碼，其他尾數都有 4 個（例如尾 1 是 1、11、21、31），所以尾 0 本來就比較少出現。app 裡的排名和「雙冷」都已經校正過這一點。`],
   ["「卡方值」是什麼？", `用來判斷「實際次數跟理論值的差距，是不是運氣就能解釋」。低於門檻（尾數 16.9、單號 53.4）代表差距在正常範圍內，純屬運氣。`],
   ["「z 分數」和「雙冷」是什麼？", `z 分數 = 跟理論值差多少 ÷ 正常會晃動的幅度。z 在 ±2 以內算正常晃動。「雙冷」是近 30 期和近 100 期都排在最冷 3 名的尾數。因為近 30 期本來就包含在近 100 期裡，雙冷不代表下一期比較會開。`],
@@ -410,6 +413,93 @@ function viewLogin(){
       <input type="password" id="pwIn" placeholder="管理密碼" autocomplete="current-password" style="flex:1;min-width:0">
       <button class="btn" ${S.busy?"disabled":""}>${S.busy?"確認中…":"登入"}</button>
     </form>${msgHTML()}</div>`;
+}
+
+/* ---------- 6 中 3 訊號 ---------- */
+// 上半：遺漏期數（幾期沒命中）；下半：K（藍）、D（紅），紅圈 = 命中
+function sigChart(series){
+  const W=320, n=series.length, x=i=>4+i*(W-8)/Math.max(n-1,1);
+  const gmax=Math.max(...series.map(s=>s.gap),1);
+  const gy=v=>62-v/gmax*52, ky=v=>140-v*0.6;
+  const line=(f,col)=>`<polyline fill="none" stroke="${col}" stroke-width="1.4" points="${series.map((s,i)=>`${x(i).toFixed(1)},${f(s).toFixed(1)}`).join(" ")}"/>`;
+  const hits=series.map((s,i)=>s.hit?`<circle cx="${x(i).toFixed(1)}" cy="${ky(s.K).toFixed(1)}" r="3.2" fill="none" stroke="var(--hot)" stroke-width="1.3"/>`:"").join("");
+  const last=series[n-1];
+  return `<svg class="sigc" viewBox="0 0 ${W} 150" role="img" aria-label="遺漏與 KD 走勢圖">
+    <text x="4" y="9" class="lab">遺漏期數（最高 ${gmax}）</text>
+    <line x1="4" x2="${W-4}" y1="62" y2="62" class="ax"/>
+    ${line(s=>gy(s.gap),"var(--cold)")}
+    <text x="4" y="78" class="lab">KD（K 藍、D 紅，虛線 = 20，紅圈 = 命中）</text>
+    <line x1="4" x2="${W-4}" y1="128" y2="128" class="ax dash"/>
+    <line x1="4" x2="${W-4}" y1="140" y2="140" class="ax"/>
+    ${line(s=>ky(s.D),"var(--hot)")}${line(s=>ky(s.K),"var(--cold)")}${hits}
+    <circle cx="${x(n-1).toFixed(1)}" cy="${ky(last.K).toFixed(1)}" r="3.5" fill="var(--cold)"/>
+  </svg>`;
+}
+function sinceLastHit(L, nums, need){
+  for(let i=L.length-1;i>=0;i--) if(nums.filter(v=>L[i].n.includes(v)).length>=need) return {ago:L.length-1-i, d:L[i].d};
+  return null;
+}
+function viewSig(){
+  const L=S.draws; if(L.length<SIG_W+30) return emptyHTML();
+  if(!S.sig) S.sig=signalAt(L, L.length)||"none";
+  const s=S.sig, last=L[L.length-1];
+  let html=`<div class="panel"><h2>6 中 3 訊號</h2>
+    <p class="note">照 YouTube「樂透統計學」影片的概念做的：在 9,139 組三球組合裡，找近 ${SIG_W} 期「3 中 2」命中間隔最規律、而且目前在低點的兩組，配成 6 個號碼。這一頁是用來<b>驗證</b>這個方法，請看最下面的回測結果。</p>`;
+  if(s==="none") return html+`<div class="verdict">用到 ${dateLabel(last.d)} 的資料，目前沒有符合條件的組合。</div></div>`+sigMethodHTML()+sigTestHTML();
+  const since6=sinceLastHit(L, s.six, 3);
+  html+=`<p class="note">用到 ${dateLabel(last.d)} 為止的資料算出：</p>
+    <div class="latest sixb">${s.six.map(ballHTML).join("")}</div>
+    <p class="note">這 6 個號碼上一次「開出其中 3 個以上」：${since6?`${since6.ago} 期前（${dateLabel(since6.d)}）`:`近 ${L.length} 期都沒有`}。隨機挑 6 個號碼，平均每 ${Math.round(1/P_6IN3)} 期就會遇到一次。</p>
+    ${sigChart(hitSeries(L, s.six, 3, SIG_W))}</div>`;
+  const grp=(name,g)=>{
+    const since=sinceLastHit(L, g.t, 2);
+    return `<div class="panel"><h2>${name}：${g.t.map(pad2).join("、")}</h2>
+      <div class="kpis"><div><span>近 ${SIG_W} 期 3 中 2</span><b>${g.m} 次</b></div><div><span>平均間隔</span><b>${g.mean.toFixed(1)} 期</b></div><div><span>已幾期沒中</span><b>${g.g} 期</b></div></div>
+      <p class="note">間隔穩定度 ${g.cv.toFixed(2)}（越小越規律）、K 值 ${g.K.toFixed(1)}。上次 3 中 2：${since?dateLabel(since.d):"—"}。</p>
+      ${sigChart(hitSeries(L, g.t, 2, SIG_W))}</div>`;
+  };
+  html+=grp("組 A", s.a)+grp("組 B", s.b);
+  return html+sigMethodHTML()+sigTestHTML();
+}
+function sigMethodHTML(){
+  return `<div class="panel"><h2>怎麼算的</h2>
+    <ol class="steps">
+      <li>39 個號碼取 3 個，共 9,139 組。某一期開出其中 2 個以上，算這組「3 中 2 命中」。</li>
+      <li>間距穩定：近 ${SIG_W} 期至少命中 4 次，命中之間隔的期數越平均越好（間隔的標準差 ÷ 平均間隔，越小越規律）。</li>
+      <li>目前在低點：K 值低於 20，而且距離上次命中，已經到了平均間隔的 0.8 到 1.2 倍（影片說的「支撐位」）。</li>
+      <li>從符合條件、最規律的前 ${SIG_TOP} 組裡，挑兩組號碼不重複的，合成 6 個號碼。</li>
+    </ol>
+    <p class="note">影片沒有公開確切算法，這是照畫面上的說明做出的版本，算出的號碼不一定跟影片一樣。K 值的算法：命中那期 RSV = 100、沒中 = 0，K = 2/3 × 前一期 K + 1/3 × RSV，D 再對 K 做一次同樣的平滑。</p>
+    <div class="verdict warn">KD 是股票的技術指標，股價有買賣雙方、前後有關係；樂透每期獨立抽球，沒有趨勢或支撐位。圖上的「規律」是從 9,139 組裡挑出看起來最整齊的，事後挑出來的規律不會延續到下一期。</div></div>`;
+}
+function sigTestHTML(){
+  const t=S.sigTest;
+  let html=`<div class="panel"><h2>回測：這個方法有沒有用？</h2>
+    <p class="note">從第 ${SIG_W+1} 期開始，每一期都只用「那一期之前」的資料照上面的方法算出 6 個號碼，再對當期開獎；同時每期也隨機挑 6 個號碼比較。包牌 = 6 個號碼買滿 6 注，每期 300 元。</p>`;
+  if(!t) return html+`<div class="btns"><button class="btn" data-act="sigtest">開始回測</button></div><p class="note">要算 700 多期，手機大約要 10–20 秒。</p></div>`;
+  if(typeof t==="number") return html+`<div class="btns"><button class="btn" disabled>計算中… ${Math.round(t*100)}%</button></div></div>`;
+  const row=(name,o)=>`<tr><td>${name}</td><td><span class="n">${(o.six/o.n*100).toFixed(2)}%</span></td><td><span class="n">${(o.h/o.n).toFixed(3)}</span></td><td><span class="n">${(o.pay/(o.n*300)*100).toFixed(0)}%</span></td></tr>`;
+  html+=`<div class="scroll"><table><thead><tr><th>選法</th><th>6 中 3</th><th>平均中幾個</th><th>包牌回收率</th></tr></thead><tbody>
+    ${row("6中3訊號",t.sig)}${row("隨機 6 個",t.rand)}
+    <tr class="theo"><td>理論值</td><td><span class="n">${(P_6IN3*100).toFixed(2)}%</span></td><td><span class="n">${(6*5/39).toFixed(3)}</span></td><td><span class="n">56%</span></td></tr></tbody></table></div>
+    <p class="note">共回測 ${t.sig.n} 期${t.none?`（另有 ${t.none} 期沒有訊號）`:""}。訊號裡每組三球的「3 中 2」命中率 ${(t.sig.a32/(t.sig.n*2)*100).toFixed(2)}%，理論值 ${(P_3IN2*100).toFixed(2)}%。</p>
+    <div class="verdict">如果這個方法真的有用，「6 中 3」和「平均中幾個」應該要明顯高於隨機和理論值；如果都在附近上下跳動，就代表跟亂選一樣。回收率波動很大，只要剛好中一次貳獎（2 萬元）就會拉高很多，那是運氣不是方法。</div>
+    <div class="btns"><button class="btn ghost" data-act="sigtest">重新回測</button></div></div>`;
+  return html;
+}
+function runSigTest(){
+  const it=backtest6Steps(S.draws);
+  S.sigTest=0; render();
+  const step=()=>{
+    const t0=Date.now(); let r;
+    do{ r=it.next(); }while(!r.done && Date.now()-t0<40);
+    if(r.done){ S.sigTest=r.value; render(); return; }
+    S.sigTest=r.value;
+    const b=document.querySelector('[data-act="sigtest"], .btn[disabled]');
+    if(b && S.tab==="sig") b.textContent=`計算中… ${Math.round(r.value*100)}%`; else if(S.tab==="sig") render();
+    setTimeout(step,0);
+  };
+  setTimeout(step,30);
 }
 
 function viewData(){
@@ -486,7 +576,7 @@ function render(){
   $("#tabs").hidden=subs.length<2;
   $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
   document.querySelectorAll("#bnav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.g===S.group));
-  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,ngap:viewNgap,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
+  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,ngap:viewNgap,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,sig:viewSig,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
   $("#view").innerHTML=v;
   const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
   const ep=$("#evPer"); if(ep) ep.onchange=e=>{ S.evPer=+e.target.value; render(); };
@@ -536,6 +626,7 @@ document.addEventListener("click", async e=>{
   if(act==="login"){ S.msg=""; go("data"); }
   else if(act==="logout"){ logout(); S.msg=""; go("tail"); }
   else if(act==="import"){ if(await runAdmin({action:"import", csv:S.csv.text})) S.csv=null; render(); }
+  else if(act==="sigtest"){ if(typeof S.sigTest!=="number") runSigTest(); }
   else if(act==="rand"){ S.randomPick=sample5(Math.random); render(); }
   else if(act==="test"){ a.disabled=true; a.textContent="計算中…"; setTimeout(()=>{ S.test=backtest(S.draws)||"few"; render(); },30); }
   else if(act==="ev"){ a.disabled=true; a.textContent="模擬中…"; setTimeout(()=>{ S.ev=simulateEV(S.draws); render(); },30); }
