@@ -9,6 +9,7 @@
  *   dailyUpdate() 觸發器每晚執行：抓兩個網站，一致就寫入；不一致或只有一邊有，以台彩官方為準
  *   doPost()      管理者用：匯入台彩官方 CSV、刪除一期（要密碼）
  *   testParse()   手動執行：在記錄裡顯示兩個網站和台彩官方各抓到幾期、最新三期，不寫入
+ *   （香港六合彩的部分在 MarkSix.gs；doGet 加 ?game=m6、dailyUpdate 結束後也會順便更新六合彩）
  *
  * 管理密碼放在「專案設定 → 指令碼屬性」，名稱 ADMIN_PASSWORD，不寫在程式裡。
  */
@@ -25,7 +26,10 @@ const OFFICIAL_API = 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/Daily539Re
 // ===== 給前端讀資料 =====
 
 // GET /exec → {"draws":[{"d":"2024-01-01","n":[3,9,27,30,33]}, ...]}，由舊到新
-function doGet() {
+// GET /exec?game=m6 → 香港六合彩（見 MarkSix.gs）
+function doGet(e) {
+  if (e && e.parameter && e.parameter.game === 'm6') return doGetMarkSix_();
+  if (e && e.parameter && e.parameter.game === 'm6probe') return probeMarkSix_();
   const draws = readSheet_().map(r => ({ d: r.d, n: r.n.split(' ').map(Number) }));
   return json_({ draws });
 }
@@ -79,6 +83,8 @@ function dailyUpdate() {
   } finally {
     lock.releaseLock();
   }
+  // 順便更新香港六合彩（出錯也不影響 539）
+  try { dailyMarkSix(); } catch (err) { console.warn('六合彩更新失敗：' + err); }
 }
 
 
@@ -173,6 +179,7 @@ function testParse() {
     console.log(`台彩官方（${month}）：查詢失敗`);
   }
   console.log(`試算表目前 ${have.size} 期`);
+  testMarkSix();
 }
 
 
