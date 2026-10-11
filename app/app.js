@@ -363,7 +363,7 @@ function viewHowto(){
     <p class="note">39 個號碼各開幾次（越紅越熱、越藍越冷）、每個號碼已經幾期沒開、每期跟上期重複幾個、和值與奇偶大小比例。「單號遺漏」最上面會比對號碼和尾數的遺漏，兩個都很久沒開的號碼標為「雙遺漏」。</p>
     ${shot("num.png","單號冷熱頁的畫面")}
     <h3>回測 › 選號回測、期望值、6中3訊號</h3>
-    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼，並用最近 150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
+    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球，各列出近 150 期中 1、2、3 個的次數），並用最近 150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
     ${shot("ev.png","期望值頁的畫面")}
     <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("test","test","去看回測")}</div></div>
 
@@ -456,10 +456,18 @@ function viewSig(){
     return `<div class="panel"><h2>${name}：${g.t.map(pad2).join("、")}</h2>
       <div class="kpis"><div><span>近 ${SIG_W} 期 3 中 2</span><b>${g.m} 次</b></div><div><span>平均間隔</span><b>${g.mean.toFixed(1)} 期</b></div><div><span>已幾期沒中</span><b>${g.g} 期</b></div></div>
       <p class="note">間隔穩定度 ${g.cv.toFixed(2)}（越小越規律）、K 值 ${g.K.toFixed(1)}。上次 3 中 2：${since?dateLabel(since.d):"—"}。</p>
+      ${triDistHTML(L, g.t)}
       ${sigChart(hitSeries(L, g.t, 2, SIG_W))}</div>`;
   };
   html+=grp("組 A", s.a)+grp("組 B", s.b);
   return html+sigMethodHTML()+sigTestHTML();
+}
+// 三個號碼近 SIG_W 期中 1／2／3 個各幾次，跟隨機的理論次數比
+function triDistHTML(L, t){
+  const c=hitDist(L, t, SIG_W), n=Math.min(SIG_W, L.length);
+  return `<div class="scroll"><table><thead><tr><th>近 ${n} 期</th><th>中 1 個</th><th>中 2 個</th><th>中 3 個</th></tr></thead><tbody>
+    <tr><td>實際</td>${[1,2,3].map(k=>`<td><span class="n">${c[k]} 次</span></td>`).join("")}</tr>
+    <tr class="theo"><td>隨機平均</td>${[1,2,3].map(k=>`<td><span class="n">${(P_TRI[k]*n).toFixed(k===3?2:1)} 次</span></td>`).join("")}</tr></tbody></table></div>`;
 }
 function sigMethodHTML(){
   return `<div class="panel"><h2>怎麼算的</h2>
@@ -490,6 +498,11 @@ function sigTestHTML(){
     ${row("第一版",t.sig)}${row("第二版",t.v2)}${row("隨機 6 個",t.rand)}
     <tr class="theo"><td>理論值</td><td><span class="n">${(P_6IN3*100).toFixed(2)}%</span></td><td><span class="n">${(6*5/39).toFixed(3)}</span></td><td><span class="n">56%</span></td></tr></tbody></table></div>
     <p class="note">回測 ${dateLabel(t.from)} 到 ${dateLabel(t.to)}，共 ${t.rand.n} 期${t.none||t.none2?`（沒有訊號：第一版 ${t.none} 期、第二版 ${t.none2} 期）`:""}。每組三球的「3 中 2」命中率：第一版 ${(t.sig.a32/(t.sig.n*2)*100).toFixed(2)}%、第二版 ${(t.v2.a32/(t.v2.n*2)*100).toFixed(2)}%，理論值 ${(P_3IN2*100).toFixed(2)}%。只有 150 期，樣本不大，6 中 3 差一兩次比例就會差很多。</p>
+    <h3>每組三球中幾個</h3>
+    <p class="note">把每期挑出的兩組三球分開看，各中了 0、1、2、3 個的比例。隨機三球 = 每期隨機 6 個號碼拆成兩組。</p>
+    <div class="scroll"><table><thead><tr><th>三球</th><th>中 0</th><th>中 1</th><th>中 2</th><th>中 3</th></tr></thead><tbody>
+      ${[["第一版",t.sig],["第二版",t.v2],["隨機",t.rand]].map(([nm,o])=>{ const tot=o.d3.reduce((x,y)=>x+y,0); return `<tr><td>${nm}</td>${o.d3.map(v=>`<td><span class="n">${(v/tot*100).toFixed(1)}%</span></td>`).join("")}</tr>`; }).join("")}
+      <tr class="theo"><td>理論值</td>${P_TRI.map(p=>`<td><span class="n">${(p*100).toFixed(p<0.01?2:1)}%</span></td>`).join("")}</tr></tbody></table></div>
     <div class="verdict">如果這個方法真的有用，「6 中 3」和「平均中幾個」應該要明顯高於隨機和理論值；如果都在附近上下跳動，就代表跟亂選一樣。回收率波動很大，只要剛好中一次貳獎（2 萬元）就會拉高很多，那是運氣不是方法。</div>
     <div class="btns"><button class="btn ghost" data-act="sigtest">重新回測</button></div></div>`;
   return html;

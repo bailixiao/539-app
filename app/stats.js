@@ -232,6 +232,15 @@ function signalAtV2(L, i){
   return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length};
 }
 
+// 三個號碼每期中 0／1／2／3 個的理論機率：C(3,k)·C(36,5−k) ÷ C(39,5)
+const P_TRI = [376992, 176715, 21420, 630].map(c=>c/575757);
+// 某組號碼近 n 期中 0、1、2、3… 個各幾期
+function hitDist(L, nums, n){
+  const c=Array(nums.length+1).fill(0);
+  for(let i=Math.max(0,L.length-n);i<L.length;i++){ const m=mset(L[i]); c[nums.reduce((t,v)=>t+m[v],0)]++; }
+  return c;
+}
+
 // 6 個號碼包牌（6 注、300 元）：中 k 個時，k 注中 k-1 個、6-k 注中 k 個
 const pay6 = k => k*(k>0?PRIZE[k-1]:0) + (6-k)*(k<6?PRIZE[Math.min(k,5)]:0);
 // 回測：從第 SIG_W+1 期起，每期只用之前的資料產生訊號，再對當期開獎；同時跟隨機 6 個號碼比
@@ -241,24 +250,25 @@ const SIG_BT = 150;
 function* backtest6Steps(L){
   if(L.length < SIG_W+30) return null;
   const start=Math.max(SIG_W, L.length-SIG_BT);
-  const r=rng(6363), res={sig:{n:0,h:0,six:0,a32:0,pay:0}, v2:{n:0,h:0,six:0,a32:0,pay:0}, rand:{n:0,h:0,six:0,pay:0}, none:0, none2:0, from:L[start].d, to:L[L.length-1].d};
+  const r=rng(6363), res={sig:{n:0,h:0,six:0,a32:0,pay:0,d3:[0,0,0,0]}, v2:{n:0,h:0,six:0,a32:0,pay:0,d3:[0,0,0,0]}, rand:{n:0,h:0,six:0,pay:0,d3:[0,0,0,0]}, none:0, none2:0, from:L[start].d, to:L[L.length-1].d};
   for(let i=start;i<L.length;i++){
     yield (i-start)/(L.length-start);
     const s2=signalAtV2(L,i);
     if(s2){
       const m2=mset(L[i]), k2=s2.six.reduce((t,v)=>t+m2[v],0);
       res.v2.n++; res.v2.h+=k2; if(k2>=3) res.v2.six++; res.v2.pay+=pay6(k2);
-      for(const g of [s2.a.t, s2.b.t]) if(g.reduce((t,v)=>t+m2[v],0)>=2) res.v2.a32++;
+      for(const g of [s2.a.t, s2.b.t]){ const k=g.reduce((t,v)=>t+m2[v],0); res.v2.d3[k]++; if(k>=2) res.v2.a32++; }
     } else res.none2++;
     const m=mset(L[i]);
     const rp=[]; while(rp.length<6){ const v=1+Math.floor(r()*39); if(!rp.includes(v)) rp.push(v); }
     const kr=rp.reduce((s,v)=>s+m[v],0);
     res.rand.n++; res.rand.h+=kr; if(kr>=3) res.rand.six++; res.rand.pay+=pay6(kr);
+    for(const g of [rp.slice(0,3), rp.slice(3)]) res.rand.d3[g.reduce((t,v)=>t+m[v],0)]++;
     const s=signalAt(L,i);
     if(!s){ res.none++; continue; }
     const k=s.six.reduce((t,v)=>t+m[v],0);
     res.sig.n++; res.sig.h+=k; if(k>=3) res.sig.six++; res.sig.pay+=pay6(k);
-    for(const g of [s.a.t, s.b.t]) if(g.reduce((t,v)=>t+m[v],0)>=2) res.sig.a32++;
+    for(const g of [s.a.t, s.b.t]){ const k=g.reduce((t,v)=>t+m[v],0); res.sig.d3[k]++; if(k>=2) res.sig.a32++; }
   }
   return res;
 }
