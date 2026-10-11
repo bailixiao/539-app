@@ -270,6 +270,104 @@ function trackNext(L){
   const out={}; for(const v of TRACK_VERSIONS){ const s=v.f(L,L.length); out[v.key]=s?s.six:null; } return out;
 }
 
+/* ---------- 六合彩的 6 中 3 訊號、回測、追蹤（2026/10/11 加入） ----------
+ * 規則跟 539 的第一版、第二版一樣（直接沿用 evalTriple／evalTripleV2），只是：
+ *   三球組合 = 49 取 3 共 18,424 組；「3 中 2」看每期 7 個號碼（6 個主號 + 特別號）。
+ *   6 個號碼有沒有「中 3」= 主號中 3 個以上 = 有中獎（七獎以上），派彩用當期實際金額。
+ * 539 的函式（signalAt 等）不動。
+ */
+let TRI_M6 = null;
+function tripleIndexM6(){
+  if(TRI_M6) return TRI_M6;
+  const key=new Int16Array(50*50*50).fill(-1), list=[];
+  for(let a=1;a<=47;a++)for(let b=a+1;b<=48;b++)for(let c=b+1;c<=49;c++){ key[a*2500+b*50+c]=list.length; list.push([a,b,c]); }
+  return TRI_M6={key, list};
+}
+const TRI_HITS_M6 = new WeakMap();
+function tripleHitsM6(L){
+  let h=TRI_HITS_M6.get(L); if(h) return h;
+  const {key, list}=tripleIndexM6();
+  h=list.map(()=>[]);
+  L.forEach((x,i)=>{
+    const n=x.n, seen=new Set();
+    for(let p=0;p<n.length;p++)for(let q=p+1;q<n.length;q++)for(let c=1;c<=49;c++){
+      if(c===n[p]||c===n[q]) continue;
+      const t=[n[p],n[q],c].sort((u,v)=>u-v), id=key[t[0]*2500+t[1]*50+t[2]];
+      if(!seen.has(id)){ seen.add(id); h[id].push(i); }
+    }
+  });
+  TRI_HITS_M6.set(L,h);
+  return h;
+}
+function pairSignal_(cand, scoreKey){
+  const top=cand.slice(0,SIG_TOP); let best=null;
+  for(let p=0;p<top.length;p++)for(let q=p+1;q<top.length;q++){
+    if(top[p].t.some(v=>top[q].t.includes(v))) continue;
+    const sc=top[p][scoreKey]+top[q][scoreKey];
+    if(!best || sc<best.sc) best={sc, a:top[p], b:top[q]};
+  }
+  return best;
+}
+function signalAtM6(L, i, W=SIG_W){
+  const {list}=tripleIndexM6(), H=tripleHitsM6(L), cand=[];
+  for(let id=0;id<list.length;id++){
+    const e=evalTriple(H[id], i, W);
+    if(e && e.K<20 && e.g>=0.8*e.mean && e.g<=1.2*e.mean) cand.push({id, t:list[id], ...e});
+  }
+  cand.sort((x,y)=>x.cv-y.cv||y.m-x.m||x.id-y.id);
+  const best=pairSignal_(cand,"cv"); if(!best) return null;
+  return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length, top10:cand.slice(0,10)};
+}
+function signalAtV2M6(L, i, W=SIG_W){
+  const {list}=tripleIndexM6(), H=tripleHitsM6(L), cand=[];
+  for(let id=0;id<list.length;id++){
+    const e=evalTripleV2(H[id], i, W);
+    if(e && e.amp<=0.5) cand.push({id, t:list[id], ...e});
+  }
+  cand.sort((x,y)=>x.err-y.err||x.amp-y.amp||x.id-y.id);
+  const best=pairSignal_(cand,"err"); if(!best) return null;
+  return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length};
+}
+const P_PRIZE_M6 = 260624/13983816;                                    // 隨機 6 個號碼，主號中 3 個以上（有中獎）
+const P_3IN2_M6 = (3*comb(46,5)+comb(46,4))/comb(49,7);               // 隨機 3 個號碼，7 個開出號碼裡有 2 個以上
+const P_TRI_M6 = [0,1,2,3].map(k=>comb(3,k)*comb(46,7-k)/comb(49,7));  // 3 個號碼在 7 個開出號碼裡中 0–3 個
+function* backtest6StepsM6(L){
+  if(L.length < SIG_W+30) return null;
+  const big=Math.max(...SIG_BTS), start=Math.max(SIG_W, L.length-big), r=rng(6364), res={};
+  const blank=s=>{ const o=()=>({n:0,h:0,six:0,a32:0,pay:0,d3:[0,0,0,0]}); const x={rand:o(), from:L[s].d, to:L[L.length-1].d, none:{}}; for(const W of SIG_WS){ x["sig"+W]=o(); x["v2_"+W]=o(); } return x; };
+  for(const w of SIG_BTS) res[w]=blank(Math.max(SIG_W, L.length-w));
+  const add=(o, six, tris, x, m)=>{
+    const c=m6Check(six,x); o.n++; o.h+=c.main; if(c.main>=3) o.six++; o.pay+=c.pay;
+    for(const g of tris){ const k=g.reduce((t,v)=>t+m[v],0); o.d3[k]++; if(k>=2) o.a32++; }
+  };
+  for(let i=start;i<L.length;i++){
+    yield (i-start)/(L.length-start);
+    const x=L[i], m=mset(x), ws=SIG_BTS.filter(w=>i>=L.length-w).map(w=>res[w]);
+    const rp=sampleK(r,6,49), sigs={};
+    for(const W of SIG_WS){ sigs["sig"+W]=signalAtM6(L,i,W); sigs["v2_"+W]=signalAtV2M6(L,i,W); }
+    for(const o of ws){
+      add(o.rand, rp, [rp.slice(0,3), rp.slice(3)], x, m);
+      for(const k in sigs){ const s=sigs[k]; if(s) add(o[k], s.six, [s.a.t, s.b.t], x, m); else o.none[k]=(o.none[k]||0)+1; }
+    }
+  }
+  return res;
+}
+const TRACK_START_M6 = "2026-10-12";
+const TRACK_VERSIONS_M6 = [];
+for(const W of SIG_WS) TRACK_VERSIONS_M6.push({key:"sig"+W, name:`第一版（${W} 期）`, f:(L,i)=>signalAtM6(L,i,W)});
+for(const W of SIG_WS) TRACK_VERSIONS_M6.push({key:"v2_"+W, name:`第二版（${W} 期）`, f:(L,i)=>signalAtV2M6(L,i,W)});
+function trackRecordsM6(L){
+  const rows=[];
+  for(let i=0;i<L.length;i++){
+    if(L[i].d<TRACK_START_M6) continue;
+    const r={i, d:L[i].d, n:L[i].n, x:L[i], hits:{}, pay:{}};
+    for(const v of TRACK_VERSIONS_M6){ const s=v.f(L,i); if(s){ const c=m6Check(s.six,L[i]); r.hits[v.key]=c.main; r.pay[v.key]=c.pay; } else { r.hits[v.key]=null; r.pay[v.key]=0; } }
+    rows.push(r);
+  }
+  return rows;
+}
+function trackNextM6(L){ const out={}; for(const v of TRACK_VERSIONS_M6){ const s=v.f(L,L.length); out[v.key]=s?s.six:null; } return out; }
+
 // 6 個號碼包牌（6 注、300 元）：中 k 個時，k 注中 k-1 個、6-k 注中 k 個
 const pay6 = k => k*(k>0?PRIZE[k-1]:0) + (6-k)*(k<6?PRIZE[Math.min(k,5)]:0);
 // 回測最近 150 期，同時統計最後 30 期（每期各自只用它前面 SIG_W 期分析，再對當期開獎；跟隨機 6 個號碼比）
