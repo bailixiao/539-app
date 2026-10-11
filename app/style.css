@@ -170,3 +170,11 @@ table.top10 th{white-space:nowrap;padding-left:2px;padding-right:2px}
 table.top10 td{padding-left:2px;padding-right:2px}
 table.top10 .sballs{flex-wrap:nowrap;gap:3px}
 table.top10 .gball.sm{width:28px;height:28px;font-size:14px}
+table.trk th,table.trk td{padding:6px 2px;white-space:nowrap}
+table.trk .gball.sm{width:21px;height:21px;font-size:11px}
+table.trk td.trkd{text-align:left}
+table.trk td.trkd > span:first-child{display:block;font:500 14px var(--num);color:var(--muted)}
+table.trk th{font-size:13px;line-height:1.2;text-align:center}
+table.trk td{text-align:center}
+table.trk .sballs{flex-wrap:nowrap;gap:2px}
+.n.hit3{background:var(--hot);color:#fff;border-radius:4px;padding:0 5px}

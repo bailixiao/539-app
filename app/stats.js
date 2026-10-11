@@ -242,6 +242,28 @@ function hitDist(L, nums, n){
   return c;
 }
 
+/* ---------- 6 中 3 追蹤紀錄（2026/10/11 開始） ----------
+ * 從 TRACK_START 起，每一期用「那一期之前」的資料，照 6 種版本算出 6 個號碼，再對當期開獎。
+ * 規則固定不改（signalAt／signalAtV2 與 SIG_WS），所以每次重算的結果都一樣，等於每晚自動記錄。
+ */
+const TRACK_START = "2026-10-12";
+const TRACK_VERSIONS = [];
+for(const W of SIG_WS) TRACK_VERSIONS.push({key:"sig"+W, name:`第一版（${W} 期）`, f:(L,i)=>signalAt(L,i,W)});
+for(const W of SIG_WS) TRACK_VERSIONS.push({key:"v2_"+W, name:`第二版（${W} 期）`, f:(L,i)=>signalAtV2(L,i,W)});
+function trackRecords(L){
+  const rows=[];
+  for(let i=0;i<L.length;i++){
+    if(L[i].d<TRACK_START) continue;
+    const m=mset(L[i]), r={i, d:L[i].d, n:L[i].n, hits:{}, six:{}};
+    for(const v of TRACK_VERSIONS){ const s=v.f(L,i); r.six[v.key]=s?s.six:null; r.hits[v.key]=s?s.six.reduce((t,x)=>t+m[x],0):null; }
+    rows.push(r);
+  }
+  return rows;
+}
+function trackNext(L){
+  const out={}; for(const v of TRACK_VERSIONS){ const s=v.f(L,L.length); out[v.key]=s?s.six:null; } return out;
+}
+
 // 6 個號碼包牌（6 注、300 元）：中 k 個時，k 注中 k-1 個、6-k 注中 k 個
 const pay6 = k => k*(k>0?PRIZE[k-1]:0) + (6-k)*(k<6?PRIZE[Math.min(k,5)]:0);
 // 回測最近 150 期，同時統計最後 30 期（每期各自只用它前面 SIG_W 期分析，再對當期開獎；跟隨機 6 個號碼比）

@@ -10,7 +10,7 @@ const GROUPS = {
   tail: [["dist","分布"],["gap","遺漏"],["trend","走勢"],["cross","交叉比對"]],
   num:  [["num","單號冷熱"],["ngap","單號遺漏"],["rep","連莊"],["combo","組合特徵"]],
   hist: [["hist","歷史"]],
-  test: [["test","選號回測"],["ev","期望值"],["sig","6中3訊號"]],
+  test: [["test","選號回測"],["ev","期望值"],["sig","6中3訊號"],["track","追蹤紀錄"]],
   help: [["howto","使用教學"],["faq","常見問題"]],
   data: [["data","資料"]]
 };
@@ -54,7 +54,7 @@ async function fetchLatest(){
   }catch(e){
     S.source = S.draws.length ? "cache" : "error";
   }
-  S.test = null; S.ev = null; S.sig = null;
+  S.test = null; S.ev = null; S.sig = null; S.track = null;
   if(typeof S.sigTest!=="number") S.sigTest = null;
   render();
 }
@@ -396,8 +396,8 @@ function viewHowto(){
     <h3>歷史</h3>
     <p class="note">每一期的期別、日期、星期和 5 個號碼，可以選看最近 10、20、30、40、100、200 期或全部。</p>
     ${shot("hist.png","開獎歷史頁的畫面")}
-    <h3>回測 › 選號回測、期望值、6中3訊號</h3>
-    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球；找規律可切換用近 30、60、150 期，各列出中 1、2、3 個的次數，另列前 10 名候選組合），並用最近 30 期、150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
+    <h3>回測 › 選號回測、期望值、6中3訊號、追蹤紀錄</h3>
+    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球；找規律可切換用近 30、60、150 期，各列出中 1、2、3 個的次數，另列前 10 名候選組合），並用最近 30 期、150 期回測它有沒有用（另有依波峰預測的第二版）。「追蹤紀錄」從 10/12 起每期自動記錄 6 種版本事前算出的號碼和實際中了幾個，用來公平地往後驗證。</p>
     ${shot("ev.png","期望值頁的畫面")}
     <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("hist","hist","去看歷史")}${goBtn("test","test","去看回測")}</div></div>
 
@@ -424,6 +424,7 @@ const FAQ = [
   ["「冷熱」和「遺漏」有什麼不同？", `冷熱看的是一段期間「總共開幾次」，遺漏看的是從最新一期往回數「連續幾期沒開」。例如某個號碼近 100 期開了 10 次，但如果都集中在前面，最近可能已經 40 幾期沒開。「號碼 › 單號遺漏」看每個號碼，「尾數 › 遺漏」看每個尾數。`],
   ["「雙遺漏」是什麼？要特別買嗎？", `號碼本身超過 20 期沒開，而且它的尾數也超過平均 3 倍沒開（尾 0 是 6 期以上，其他尾數 4 期以上），就標為「雙遺漏」。這只是觀察，不代表比較會開。「回測」裡的「追遺漏號」策略就是每期買最久沒開的 5 個號碼，用過去 700 多期實際跑的結果，跟亂選差不多。`],
   ["「6中3訊號」準嗎？可以照著買嗎？", `不準。這一頁是把網路影片「用 KD 線找支撐位反彈」的方法照做一遍，再用最近 30 期、150 期實際回測（包括第一版和「波峰預測」第二版）：兩版開出 6 中 3 的機率都沒有比隨機挑 6 個號碼高。KD 是股票的技術指標，樂透每期獨立抽球，沒有趨勢可言。隨便挑 6 個號碼，平均每 52 期本來就會遇到一次 6 中 3。`],
+  ["「追蹤紀錄」跟「回測」有什麼不同？", `回測是拿過去的資料「事後」驗證，試的方法越多，越容易剛好有一種看起來很好。追蹤紀錄從 10/12 開始，每期用當時以前的資料先算好號碼、開獎後才對獎，規則固定不改，所以是比較公平的測試。要累積幾百期，結果才有意義。`],
   ["為什麼尾 0 的次數特別少？", `尾 0 只有 10、20、30 三個號碼，其他尾數都有 4 個（例如尾 1 是 1、11、21、31），所以尾 0 本來就比較少出現。app 裡的排名和「雙冷」都已經校正過這一點。`],
   ["「卡方值」是什麼？", `用來判斷「實際次數跟理論值的差距，是不是運氣就能解釋」。低於門檻（尾數 16.9、單號 53.4）代表差距在正常範圍內，純屬運氣。`],
   ["「z 分數」和「雙冷」是什麼？", `z 分數 = 跟理論值差多少 ÷ 正常會晃動的幅度。z 在 ±2 以內算正常晃動。「雙冷」是近 30 期和近 100 期都排在最冷 3 名的尾數。因為近 30 期本來就包含在近 100 期裡，雙冷不代表下一期比較會開。`],
@@ -561,6 +562,35 @@ function sigTestHTML(){
     <div class="btns"><button class="btn ghost" data-act="sigtest">重新回測</button></div></div>`;
   return html;
 }
+/* ---------- 6 中 3 追蹤紀錄 ---------- */
+function viewTrack(){
+  const L=S.draws; if(L.length<SIG_W+30) return emptyHTML();
+  if(!S.track) S.track={rows:trackRecords(L), next:trackNext(L)};
+  const {rows, next}=S.track, last=L[L.length-1], start=dateLabel(TRACK_START);
+  const nextDate=(()=>{ const d=new Date(last.d+"T00:00:00Z"); do{ d.setUTCDate(d.getUTCDate()+1); }while(d.getUTCDay()===0); return dateLabel(ymd(d)); })();
+  let html=`<div class="panel"><h2>6 中 3 追蹤紀錄</h2>
+    <p class="note">從 ${start} 開始，每一期都用「那一期之前」的資料，照 6 種版本（第一版、第二版 × 找規律 30／60／150 期）各算出 6 個號碼，開獎後對照中了幾個。規則從開始追蹤後就固定不改，所以這裡的紀錄就是「事前算好、事後對獎」的真實結果。</p>
+    <div class="verdict">回測是用過去的資料「事後」驗證，試了很多種方法，總會有一兩種剛好看起來很好。往後追蹤才是公平的測試：如果某個版本真的有效，未來幾百期應該會持續高於理論值（6 中 3 約 ${(P_6IN3*100).toFixed(1)}%、平均中 ${(6*5/39).toFixed(3)} 個）；如果是運氣，就會慢慢回到理論值附近。</div></div>`;
+  html+=`<div class="panel"><h2>下一期（${nextDate}）各版本的號碼</h2>
+    <p class="note">用到 ${dateLabel(last.d)} 的資料算出，開獎後會自動記錄到下面。</p>
+    <div class="list">${TRACK_VERSIONS.map(v=>`<div class="it"><span>${v.name}</span>${next[v.key]?sballs(next[v.key]):'<span class="note">沒有訊號</span>'}</div>`).join("")}</div></div>`;
+  if(!rows.length) return html+`<div class="panel"><h2>累積結果</h2><p class="note">還沒有資料。${start} 開獎、晚上自動更新後，這裡就會出現第一筆紀錄。</p></div>`;
+  const sum=TRACK_VERSIONS.map(v=>{ const hs=rows.map(r=>r.hits[v.key]).filter(h=>h!==null); const n=hs.length;
+    return {v, n, six:hs.filter(h=>h>=3).length, avg:n?hs.reduce((a,b)=>a+b,0)/n:0, pay:hs.reduce((a,k)=>a+pay6(k),0), big:hs.filter(h=>h>=4).length}; });
+  html+=`<div class="panel"><h2>累積結果（${rows.length} 期）</h2>
+    <div class="scroll"><table><thead><tr><th>版本</th><th>6 中 3</th><th>平均中幾個</th><th>包牌回收率</th></tr></thead><tbody>
+    ${sum.map(x=>`<tr><td>${x.v.name}</td><td><span class="n">${x.six} 次</span><small class="avg">${x.n?(x.six/x.n*100).toFixed(1):"—"}%</small></td><td><span class="n">${x.n?x.avg.toFixed(3):"—"}</span></td><td><span class="n">${x.n?(x.pay/(x.n*300)*100).toFixed(0):"—"}%</span></td></tr>`).join("")}
+    <tr class="theo"><td>理論值</td><td><span class="n">${(P_6IN3*rows.length).toFixed(1)} 次</span><small class="avg">${(P_6IN3*100).toFixed(1)}%</small></td><td><span class="n">${(6*5/39).toFixed(3)}</span></td><td><span class="n">56%</span></td></tr></tbody></table></div>
+    <p class="note">${rows.length<100?`目前只有 ${rows.length} 期，6 中 3 理論上平均每 52 期才一次，樣本太少，先不要下結論；至少累積幾百期再看。`:"期數越多越準。看的重點是：有沒有哪個版本長期、穩定地高於理論值。"}</p></div>`;
+  const keys=TRACK_VERSIONS.map(v=>v.key), short=["一<br>30","一<br>60","一<br>150","二<br>30","二<br>60","二<br>150"];
+  html+=`<div class="panel"><h2>每期紀錄</h2>
+    <p class="note">每一格是該版本 6 個號碼中了幾個，3 個以上（6 中 3）會標紅。欄位「一／30」是第一版用 30 期找規律，「二／60」是第二版用 60 期，以此類推。</p>
+    <div class="scroll"><table class="trk"><thead><tr><th>日期／開出</th>${short.map(s=>`<th>${s}</th>`).join("")}</tr></thead><tbody>
+    ${rows.slice().reverse().map(r=>`<tr><td class="trkd"><span>${+r.d.slice(5,7)}/${+r.d.slice(8,10)}</span>${sballs(r.n)}</td>${keys.map(k=>{ const h=r.hits[k]; return `<td><span class="n${h>=3?" hit3":""}">${h===null?"—":h}</span></td>`; }).join("")}</tr>`).join("")}
+    </tbody></table></div></div>`;
+  return html;
+}
+
 function runSigTest(){
   const it=backtest6Steps(S.draws);
   S.sigTest=0; render();
@@ -650,7 +680,7 @@ function render(){
   $("#tabs").hidden=subs.length<2;
   $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
   document.querySelectorAll("#bnav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.g===S.group));
-  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,ngap:viewNgap,hist:viewHist,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,sig:viewSig,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
+  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,ngap:viewNgap,hist:viewHist,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,sig:viewSig,track:viewTrack,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
   $("#view").innerHTML=v;
   const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
   const hs=$("#histSel"); if(hs) hs.onchange=e=>{ S.histN=e.target.value==="all"?"all":+e.target.value; render(); };
