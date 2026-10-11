@@ -199,15 +199,57 @@ function signalAt(L, i){
   if(!best) return null;
   return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length};
 }
+/* 第二版（2026/10/11 新增，依另一個 AI 建議的「波峰／波谷／週期振幅／週期預測」具體化）：
+ * 每次 3 中 2 命中 = 波峰，兩個波峰之間 = 一個週期。
+ * 週期振幅 =（最長週期 − 最短週期）÷ 平均週期，要 ≤ 0.5。
+ * 週期預測 = 加權平均週期，越近的週期權重越高（1, 2, 3 …）。
+ * 目前位置：下一期（距上次波峰 g+1 期）跟預測週期的相對誤差越小越好。
+ * 前 30 名裡挑兩組號碼不重複、誤差合計最小的，合成 6 個號碼。
+ */
+function evalTripleV2(h, i){
+  const lo=lowerBound(h,i-SIG_W), hi=lowerBound(h,i), m=hi-lo;
+  if(m<4) return null;
+  let wsum=0, wtot=0, mn=1e9, mx=0, s=0;
+  for(let k=lo+1, w=1;k<hi;k++, w++){ const d=h[k]-h[k-1]; wsum+=d*w; wtot+=w; s+=d; mn=Math.min(mn,d); mx=Math.max(mx,d); }
+  const mean=s/(m-1), amp=(mx-mn)/mean, pred=wsum/wtot, g=i-1-h[hi-1];
+  return {m, mean, amp, pred, g, err:Math.abs(g+1-pred)/pred};
+}
+function signalAtV2(L, i){
+  const {list}=tripleIndex(), H=tripleHits(L), cand=[];
+  for(let id=0;id<list.length;id++){
+    const e=evalTripleV2(H[id], i);
+    if(e && e.amp<=0.5) cand.push({id, t:list[id], ...e});
+  }
+  cand.sort((x,y)=>x.err-y.err||x.amp-y.amp||x.id-y.id);
+  const top=cand.slice(0,SIG_TOP);
+  let best=null;
+  for(let p=0;p<top.length;p++)for(let q=p+1;q<top.length;q++){
+    if(top[p].t.some(v=>top[q].t.includes(v))) continue;
+    const sc=top[p].err+top[q].err;
+    if(!best || sc<best.sc) best={sc, a:top[p], b:top[q]};
+  }
+  if(!best) return null;
+  return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length};
+}
+
 // 6 個號碼包牌（6 注、300 元）：中 k 個時，k 注中 k-1 個、6-k 注中 k 個
 const pay6 = k => k*(k>0?PRIZE[k-1]:0) + (6-k)*(k<6?PRIZE[Math.min(k,5)]:0);
 // 回測：從第 SIG_W+1 期起，每期只用之前的資料產生訊號，再對當期開獎；同時跟隨機 6 個號碼比
+// 回測最近 SIG_BT 期（每期各自用它前面 SIG_W 期分析）
+const SIG_BT = 150;
 // 寫成 generator：每算完一期就交回控制權，畫面可以顯示進度、不會卡住
 function* backtest6Steps(L){
   if(L.length < SIG_W+30) return null;
-  const r=rng(6363), res={sig:{n:0,h:0,six:0,a32:0,pay:0}, rand:{n:0,h:0,six:0,pay:0}, none:0};
-  for(let i=SIG_W;i<L.length;i++){
-    yield (i-SIG_W)/(L.length-SIG_W);
+  const start=Math.max(SIG_W, L.length-SIG_BT);
+  const r=rng(6363), res={sig:{n:0,h:0,six:0,a32:0,pay:0}, v2:{n:0,h:0,six:0,a32:0,pay:0}, rand:{n:0,h:0,six:0,pay:0}, none:0, none2:0, from:L[start].d, to:L[L.length-1].d};
+  for(let i=start;i<L.length;i++){
+    yield (i-start)/(L.length-start);
+    const s2=signalAtV2(L,i);
+    if(s2){
+      const m2=mset(L[i]), k2=s2.six.reduce((t,v)=>t+m2[v],0);
+      res.v2.n++; res.v2.h+=k2; if(k2>=3) res.v2.six++; res.v2.pay+=pay6(k2);
+      for(const g of [s2.a.t, s2.b.t]) if(g.reduce((t,v)=>t+m2[v],0)>=2) res.v2.a32++;
+    } else res.none2++;
     const m=mset(L[i]);
     const rp=[]; while(rp.length<6){ const v=1+Math.floor(r()*39); if(!rp.includes(v)) rp.push(v); }
     const kr=rp.reduce((s,v)=>s+m[v],0);
