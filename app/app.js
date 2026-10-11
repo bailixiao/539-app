@@ -87,7 +87,9 @@ function dateLabel(s){ const d=new Date(s+"T00:00:00Z"); return `${d.getUTCMonth
 /* ---------- 畫面 ---------- */
 const $ = s => document.querySelector(s);
 const pad2 = v => String(v).padStart(2,"0");
-function ballHTML(v){ const s=pad2(v); return `<span class="ball">${s[0]}<b>${s[1]}</b></span>`; }
+function ballHTML(v){ return `<span class="gball">${pad2(v)}</span>`; }
+const sballHTML = v => `<span class="gball sm">${pad2(v)}</span>`;
+const sballs = a => `<span class="sballs">${a.map(sballHTML).join("")}</span>`;
 function gballHTML(v){ return `<span class="gball">${pad2(v)}</span>`; }
 // 期別 = 民國年 × 1,000,000 + 當年第幾期（資料從 2024/1/1 起完整，所以可以照順序算）
 const PERIODS=new WeakMap();
@@ -228,7 +230,7 @@ function viewNum(){
       <div class="hn"><span class="ho${x.o===maxO?" mx":""}">${x.o}</span><span class="hg${g===maxG?" mx":""}">${g}</span></div></div>`;
   }).join("");
   const s=arr.slice().sort((a,b)=>b.z-a.z);
-  const li=a=>a.map(x=>`<div class="it"><span class="ns">${pad2(x.v)}</span><span>${x.o} 次</span><span class="n">z ${x.z>=0?"+":"−"}${Math.abs(x.z).toFixed(1)}</span></div>`).join("");
+  const li=a=>a.map(x=>`<div class="it">${sballHTML(x.v)}<span>${x.o} 次</span><span class="n">z ${x.z>=0?"+":"−"}${Math.abs(x.z).toFixed(1)}</span></div>`).join("");
   const ok=chi<53.4, n=L.length;
   return `<div class="panel"><h2>單號冷熱</h2>
     ${rangeHTML()}
@@ -265,7 +267,7 @@ function viewNgap(){
   const md=s=>s?`${+s.slice(5,7)}/${+s.slice(8,10)}`:"—";
   const rows=g.map(x=>{
     const pct=x.prob*100, strong=x.cur>=avg*3;
-    return `<tr><td class="d">${pad2(x.v)}${both(x)?'<span class="tag" style="background:var(--cold);color:#fff">雙遺漏</span>':""}</td><td><span class="n"${strong?' style="color:var(--cold);font-weight:700"':""}>${x.cur}</span></td><td><span class="n">${x.longest}</span></td>
+    return `<tr><td class="d"><div class="dcell">${sballHTML(x.v)}${both(x)?'<span class="tag dtag">雙遺漏</span>':""}</div></td><td><span class="n"${strong?' style="color:var(--cold);font-weight:700"':""}>${x.cur}</span></td><td><span class="n">${x.longest}</span></td>
       <td><span class="n">${md(x.last)}</span></td><td><span class="n">${x.cur?pct.toFixed(pct<1?2:1)+"%":"—"}</span></td></tr>`;
   }).join("");
   const top=g[0], dual=g.filter(both);
@@ -273,11 +275,11 @@ function viewNgap(){
   const crossPanel=`<div class="panel"><h2>號碼 × 尾數 遺漏比對</h2>
     <p class="note">把「單號遺漏」和「尾數遺漏」放在一起看：號碼本身超過 ${Math.round(avg*3)} 期沒開，而且它的尾數也超過平均 3 倍沒開（尾 0 是 6 期以上，其他尾數 4 期以上），標為「雙遺漏」。</p>
     <p class="note">各尾數目前遺漏（期）：${tailLine}</p>
-    <div class="verdict">${dual.length?`目前雙遺漏：${dual.map(x=>`${pad2(x.v)}（${x.cur} 期，尾 ${x.v%10} 已 ${tg[x.v%10].cur} 期）`).join("、")}。`:`目前沒有雙遺漏的號碼。`}這只是觀察：號碼和尾數遺漏多久，下一期開出的機率都不變。「追遺漏號」到底有沒有用，可以到「選號回測」看實際結果。</div></div>`;
+    <div class="verdict">${dual.length?`目前雙遺漏：${dual.map(x=>`${sballHTML(x.v)}（${x.cur} 期，尾 ${x.v%10} 已 ${tg[x.v%10].cur} 期）`).join("、")}。`:`目前沒有雙遺漏的號碼。`}這只是觀察：號碼和尾數遺漏多久，下一期開出的機率都不變。「追遺漏號」到底有沒有用，可以到「選號回測」看實際結果。</div></div>`;
   return crossPanel+`<div class="panel"><h2>單號遺漏</h2>
     <p class="note">「遺漏」是每個號碼從最新一期往回算，連續幾期沒開出，最久沒開的排最前面。「最長」是統計全部 ${L.length} 期（從 ${L[0].d} 開始）裡，最久連續幾期沒開。「遺漏機率」是連續這麼多期都沒開的機率。平均每個號碼約 ${avg.toFixed(1)} 期會開出一次，目前遺漏超過 ${Math.round(avg*3)} 期的標成藍色。</p>
     <div class="scroll"><table><thead><tr><th>號碼</th><th>遺漏</th><th>最長</th><th>最後開出</th><th>遺漏機率</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="verdict">目前最久沒開的是 ${pad2(top.v)}，已經 ${top.cur} 期。單看一個號碼，連續 ${top.cur} 期沒開的機率只有 ${(top.prob*100).toFixed(top.prob<0.01?2:1)}%，但一共有 39 個號碼，總會有某個號碼剛好拖很久，這很常見。不管遺漏多久，每個號碼下一期開出的機率都一樣是 ${(P_NUM*100).toFixed(1)}%，不會因為「很久沒出」而變高。</div>
+    <div class="verdict">目前最久沒開的是 ${sballHTML(top.v)}，已經 ${top.cur} 期。單看一個號碼，連續 ${top.cur} 期沒開的機率只有 ${(top.prob*100).toFixed(top.prob<0.01?2:1)}%，但一共有 39 個號碼，總會有某個號碼剛好拖很久，這很常見。不管遺漏多久，每個號碼下一期開出的機率都一樣是 ${(P_NUM*100).toFixed(1)}%，不會因為「很久沒出」而變高。</div>
     <p class="note">「冷熱」看的是一段期間總共開幾次，「遺漏」看的是最近連續幾期沒開，兩個是不同的數字。例如一個號碼近 100 期開了 10 次，但如果全都集中在前面，最近還是可能很久沒開。</p></div>`;
 }
 
@@ -293,7 +295,7 @@ function viewRep(){
   return `<div class="panel"><h2>連莊統計</h2>
     <p class="note">每一期跟上一期比，有幾個號碼重複開出。統計全部 ${n} 組相鄰兩期，白線／黑線是理論值。</p>
     <div class="rows">${rows}</div>
-    <div class="verdict">實際平均每期連莊 ${mean.toFixed(3)} 個，理論值 0.641 個。最新一期 ${last.d} ${rep.length?`連莊了 ${rep.map(pad2).join("、")}`:"沒有連莊號碼"}。「上期開過的號碼這期比較容易再出」如果是真的，實際值會明顯高於理論值；兩者接近，就代表上一期對這一期沒有影響。</div></div>`;
+    <div class="verdict">實際平均每期連莊 ${mean.toFixed(3)} 個，理論值 0.641 個。最新一期 ${last.d} ${rep.length?`連莊了 ${sballs(rep)}`:"沒有連莊號碼"}。「上期開過的號碼這期比較容易再出」如果是真的，實際值會明顯高於理論值；兩者接近，就代表上一期對這一期沒有影響。</div></div>`;
 }
 
 function featBlock(title,note,labels,theo,act,N){
@@ -485,7 +487,7 @@ function viewSig(){
     ${sigChart(hitSeries(L, s.six, 3, SIG_W))}</div>`;
   const grp=(name,g)=>{
     const since=sinceLastHit(L, g.t, 2);
-    return `<div class="panel"><h2>${name}：${g.t.map(pad2).join("、")}</h2>
+    return `<div class="panel"><h2 class="gh">${name}${sballs(g.t)}</h2>
       <div class="kpis"><div><span>近 ${SIG_W} 期 3 中 2</span><b>${g.m} 次</b></div><div><span>平均間隔</span><b>${g.mean.toFixed(1)} 期</b></div><div><span>已幾期沒中</span><b>${g.g} 期</b></div></div>
       <p class="note">間隔穩定度 ${g.cv.toFixed(2)}（越小越規律）、K 值 ${g.K.toFixed(1)}。上次 3 中 2：${since?dateLabel(since.d):"—"}。</p>
       ${triDistHTML(L, g.t)}
@@ -575,7 +577,7 @@ function viewData(){
   const recentList=L.slice(-20).reverse();
   html+=`<div class="panel"><h2>最近資料</h2>
     <p class="note">發現某一期號碼錯了，可以刪除；如果兩個開獎網站資料正確，當晚自動抓號會再補回來。</p>
-    <div class="list">${recentList.map(x=>`<div class="it"><span>${x.d}</span><span class="ns">${x.n.map(pad2).join(" ")}</span><button class="x" data-del="${x.d}" ${S.busy?"disabled":""}>刪除</button></div>`).join("")||'<p class="note">還沒有資料。</p>'}</div></div>`;
+    <div class="list">${recentList.map(x=>`<div class="it"><span>${x.d}</span>${sballs(x.n)}<button class="x" data-del="${x.d}" ${S.busy?"disabled":""}>刪除</button></div>`).join("")||'<p class="note">還沒有資料。</p>'}</div></div>`;
   html+=`<div class="panel"><div class="btns" style="margin-top:0"><button class="btn ghost" data-act="logout">登出管理者</button></div>
     <p class="note">登出後「資料」分頁會隱藏，要再輸入密碼才看得到。</p></div>`;
   return html;
