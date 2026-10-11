@@ -29,7 +29,6 @@ const OFFICIAL_API = 'https://api.taiwanlottery.com/TLCAPIWeB/Lottery/Daily539Re
 // GET /exec?game=m6 → 香港六合彩（見 MarkSix.gs）
 function doGet(e) {
   if (e && e.parameter && e.parameter.game === 'm6') return doGetMarkSix_();
-  if (e && e.parameter && e.parameter.game === 'm6probe') return probeMarkSix_();
   const draws = readSheet_().map(r => ({ d: r.d, n: r.n.split(' ').map(Number) }));
   return json_({ draws });
 }

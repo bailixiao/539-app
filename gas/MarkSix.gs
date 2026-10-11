@@ -62,12 +62,6 @@ fragment lotteryDrawsFragment on LotteryDraw {
 // ===== 給前端讀資料 =====
 
 // GET /exec?game=m6 → {"draws":[{"d":"2024-01-02","no":"24/001","n":[...6 個],"s":特別號}, ...]}，由舊到新
-// 暫時用：檢查 Google 伺服器連不連得到賽馬會（只讀，不寫入）。確認後會刪掉
-function probeMarkSix_() {
-  const got = fetchMarkSix_({ lastNDraw: 3, startDate: null, endDate: null, drawType: 'All' });
-  return json_({ ok: !!got, draws: got || [] });
-}
-
 function doGetMarkSix_() {
   const draws = readMarkSix_().map(r => ({ d: r.d, no: r.no, n: r.n, s: r.s }));
   return json_({ draws });
