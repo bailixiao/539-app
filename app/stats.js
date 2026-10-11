@@ -375,6 +375,63 @@ function comboCountsG(L){
   L.forEach(x=>{ const f=featsG(x.n); A.sum[f.sum]++; A.odd[f.odd]++; A.big[f.big]++; A.cons[f.cons]++; });
   return A;
 }
+/* ---------- 六合彩：回測、期望值（2026/10/11 加入） ----------
+ * 一注 = 6 個號碼、10 元。開獎 6 個主號 + 1 個特別號。
+ * 中獎看「中幾個主號」和「特別號在不在你選的 6 個裡」。派彩用賽馬會每期實際公布的金額（x.p，頭獎到七獎）。
+ */
+const M6_TOTAL = 13983816;   // 49 取 6
+const M6_TIERS = [["頭獎","6 個全中",1],["二獎","5 個＋特別號",6],["三獎","5 個",252],["四獎","4 個＋特別號",630],["五獎","4 個",12915],["六獎","3 個＋特別號",17220],["七獎","3 個",229600]];
+const m6Tier = (main, sp) => main===6?1 : main===5?(sp?2:3) : main===4?(sp?4:5) : main===3?(sp?6:7) : 0;
+function m6Check(pick, x){
+  const main=pick.filter(v=>x.main.includes(v)).length, sp=pick.includes(x.s), tier=m6Tier(main,sp);
+  return {main, sp, tier, pay: tier && x.p ? x.p[tier-1] : 0};
+}
+function sampleK(r, k, N){ const a=[]; while(a.length<k){ const v=1+Math.floor(r()*N); if(!a.includes(v)) a.push(v); } return a.sort((x,y)=>x-y); }
+const numsOfTailG = d => { const a=[]; for(let v=1;v<=GN;v++) if(v%10===d) a.push(v); return a; };
+// 每個獎項的平均派彩：頭獎到三獎只算有人中的期數；四到七獎是固定金額
+function m6AvgPrize(L){
+  return M6_TIERS.map((_,t)=>{ const v=L.map(x=>x.p?x.p[t]:0).filter(v=>v>0); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; });
+}
+function evTableM6(L){
+  const avg=m6AvgPrize(L); let ev=0;
+  const rows=M6_TIERS.map(([name,cond,c],t)=>{ const e=c/M6_TOTAL*avg[t]; ev+=e; return {name,cond,c,p:avg[t],e}; });
+  return {rows, ev};
+}
+const STRATS_M6=[["hotT","追熱尾"],["coldT","追冷尾"],["dualT","雙冷尾"],["hotN","追熱號"],["coldN","追冷號"],["gapN","追遺漏號"],["rep","連莊"],["rand","隨機"]];
+// 選號回測：每期只用之前的資料選 6 個號碼，對當期開獎，用當期實際派彩計算
+function backtestM6(L){
+  const W=20, r=rng(4906), r2=rng(4907);
+  if(L.length < 130) return null;
+  const st={}; STRATS_M6.forEach(([k])=>st[k]={h:0,h3:0,h4:0,pay:0}); let n=0;
+  const pickFrom=tails=>tails.map(d=>{ const ns=numsOfTailG(d); return ns[Math.floor(r()*ns.length)]; });
+  const lastIdx=Array(GN+1).fill(-1);
+  for(let i=0;i<100;i++) L[i].n.forEach(v=>lastIdx[v]=i);
+  for(let i=100;i<L.length;i++){
+    const c=tailCounts(L.slice(i-W,i)).map((v,d)=>({d,v:v/K(d),t:r()}));
+    const order=c.slice().sort((a,b)=>b.v-a.v||a.t-b.t).map(o=>o.d);
+    const r30=crossRank(L.slice(i-30,i)), r100=crossRank(L.slice(i-100,i));
+    const dualOrder=r30.map((x,d)=>({d,s:x.rank+r100[d].rank,t:r()})).sort((a,b)=>a.s-b.s||a.t-b.t).map(x=>x.d);
+    const nc=Array(GN+1).fill(0); L.slice(i-30,i).forEach(x=>x.n.forEach(v=>nc[v]++));
+    const nOrder=[]; for(let v=1;v<=GN;v++) nOrder.push({v,c:nc[v],t:r()});
+    nOrder.sort((a,b)=>b.c-a.c||a.t-b.t);
+    const gOrder=[]; for(let v=1;v<=GN;v++) gOrder.push({v,g:i-1-lastIdx[v],t:r2()});
+    gOrder.sort((a,b)=>b.g-a.g||a.t-b.t);
+    const picks={hotT:pickFrom(order.slice(0,6)), coldT:pickFrom(order.slice(4)), dualT:pickFrom(dualOrder.slice(0,6)),
+      hotN:nOrder.slice(0,6).map(o=>o.v), coldN:nOrder.slice(-6).map(o=>o.v), gapN:gOrder.slice(0,6).map(o=>o.v),
+      rep:L[i-1].main.slice(), rand:sampleK(r,6,GN)};
+    for(const k in picks){ const res=m6Check(picks[k],L[i]); st[k].h+=res.main; if(res.main>=3) st[k].h3++; if(res.main>=4) st[k].h4++; st[k].pay+=res.pay; }
+    L[i].n.forEach(v=>lastIdx[v]=i);
+    n++;
+  }
+  return {n, st};
+}
+// 1,000 人每期隨機買一注，用真實開獎與派彩算最後各賺賠多少
+function simulateEVM6(L){
+  const res=[]; let big=0;
+  for(let p=0;p<1000;p++){ let pay=0, b=0; for(const x of L){ const c=m6Check(sampleK(Math.random,6,GN),x); pay+=c.pay; if(c.tier && c.tier<=3) b=1; } big+=b; res.push(pay); }
+  const cost=L.length*10, net=res.map(v=>v-cost).sort((a,b)=>a-b);
+  return {cost, big, avg:res.reduce((a,b)=>a+b,0)/1000/cost, win:net.filter(v=>v>0).length, best:net[999], worst:net[0], med:net[500]};
+}
 function comboCounts(L){
   const A={sum:Array(6).fill(0),odd:Array(6).fill(0),big:Array(6).fill(0),cons:Array(3).fill(0)};
   L.forEach(x=>{ const f=feats(x.n); A.sum[f.sum]++; A.odd[f.odd]++; A.big[f.big]++; A.cons[f.cons]++; });

@@ -199,3 +199,5 @@ table.trk .sballs{flex-wrap:nowrap;gap:2px}
 .hrow.m6 .hmeta{flex-direction:row;gap:10px;align-items:baseline}
 .hrow.m6 .hballs{gap:4px}
 .hrow.m6 .gball{width:min(40px,10.2vw);height:min(40px,10.2vw);font-size:min(19px,5vw)}
+table.ev6 th,table.ev6 td:first-child{white-space:nowrap}
+table.ev6 td{padding-left:3px;padding-right:3px}

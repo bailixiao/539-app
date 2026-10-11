@@ -2,7 +2,8 @@
  * 香港六合彩：資料後端（2026/10/11 新增）
  *
  * 工作表 marksix：第 1 列是標題，
- *   A 欄日期（純文字 yyyy-MM-dd）、B 欄期號（例如 26/108）、C–H 欄 6 個號碼（由小到大）、I 欄特別號。
+ *   A 欄日期（純文字 yyyy-MM-dd）、B 欄期號（例如 26/108）、C–H 欄 6 個號碼（由小到大）、I 欄特別號、
+ *   J–P 欄頭獎到七獎每注（10 元）派彩（2026/10/11 加入；沒人中或還沒公布是 0）。
  * 資料來源：香港賽馬會官方（info.cld.hkjc.com 的 GraphQL），這是官方資料，所以只用一個來源。
  *
  * 函式：
@@ -61,9 +62,9 @@ fragment lotteryDrawsFragment on LotteryDraw {
 
 // ===== 給前端讀資料 =====
 
-// GET /exec?game=m6 → {"draws":[{"d":"2024-01-02","no":"24/001","n":[...6 個],"s":特別號}, ...]}，由舊到新
+// GET /exec?game=m6 → {"draws":[{"d":"2024-01-02","no":"24/001","n":[...6 個],"s":特別號,"p":[頭獎…七獎派彩]}, ...]}，由舊到新
 function doGetMarkSix_() {
-  const draws = readMarkSix_().map(r => ({ d: r.d, no: r.no, n: r.n, s: r.s }));
+  const draws = readMarkSix_().map(r => ({ d: r.d, no: r.no, n: r.n, s: r.s, p: r.p }));
   return json_({ draws });
 }
 
@@ -99,7 +100,8 @@ function parseMarkSix(list) {
     const ok = n.length === 6 && new Set(n.concat([s])).size === 7 && n.concat([s]).every(v => Number.isInteger(v) && v >= 1 && v <= 49);
     const d = String(x.drawDate || '').slice(0, 10);
     if (!ok || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-    out.push({ d, no: String(x.year).slice(2) + '/' + String(x.no).padStart(3, '0'), n, s });
+    const p = [1, 2, 3, 4, 5, 6, 7].map(t => { const z = ((x.lotteryPool || {}).lotteryPrizes || []).find(q => +q.type === t); return z ? Number(z.dividend) || 0 : 0; });
+    out.push({ d, no: String(x.year).slice(2) + '/' + String(x.no).padStart(3, '0'), n, s, p });
   });
   return out.sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
 }
@@ -129,8 +131,8 @@ function importMarkSixHistory() {
   const sh = m6Sheet_(true);
   sh.clear();
   sh.getRange(1, 1, rows.length + 1, 2).setNumberFormat('@');
-  sh.getRange(1, 1, 1, 9).setValues([['日期', '期號', '號1', '號2', '號3', '號4', '號5', '號6', '特別號']]);
-  if (rows.length) sh.getRange(2, 1, rows.length, 9).setValues(rows.map(r => [r.d, r.no, ...r.n, r.s]));
+  sh.getRange(1, 1, 1, 16).setValues([['日期', '期號', '號1', '號2', '號3', '號4', '號5', '號6', '特別號', '頭獎', '二獎', '三獎', '四獎', '五獎', '六獎', '七獎']]);
+  if (rows.length) sh.getRange(2, 1, rows.length, 16).setValues(rows.map(r => [r.d, r.no, ...r.n, r.s, ...r.p]));
   console.log(`匯入完成：共 ${rows.length} 期，${rows[0].d}（${rows[0].no}）到 ${rows[rows.length - 1].d}（${rows[rows.length - 1].no}）`);
 }
 
@@ -145,15 +147,19 @@ function dailyMarkSix() {
   try {
     const got = fetchMarkSix_({ lastNDraw: 10, startDate: null, endDate: null, drawType: 'All' });
     if (!got) { console.warn('六合彩：這次沒抓到資料'); return; }
-    const have = new Set(readMarkSix_().map(r => r.d));
-    const add = got.filter(r => r.d >= M6_START && !have.has(r.d));
+    const rows = readMarkSix_(), at = new Map(rows.map((r, i) => [r.d, i]));
+    const sh = m6Sheet_();
+    // 派彩可能開獎後才公布：已經有的期數，派彩不一樣就更新
+    let fixed = 0;
+    got.forEach(r => { if (at.has(r.d) && rows[at.get(r.d)].p.join() !== r.p.join()) { sh.getRange(at.get(r.d) + 2, 10, 1, 7).setValues([r.p]); fixed++; } });
+    const add = got.filter(r => r.d >= M6_START && !at.has(r.d));
     if (add.length) {
-      const sh = m6Sheet_();
       const start = sh.getLastRow() + 1;
       sh.getRange(start, 1, add.length, 2).setNumberFormat('@');
-      sh.getRange(start, 1, add.length, 9).setValues(add.map(r => [r.d, r.no, ...r.n, r.s]));
-      if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, 9).sort(1);
+      sh.getRange(start, 1, add.length, 16).setValues(add.map(r => [r.d, r.no, ...r.n, r.s, ...r.p]));
+      if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, 16).sort(1);
     }
+    if (fixed) console.log('六合彩更新派彩 ' + fixed + ' 期');
     console.log(add.length ? '六合彩新增 ' + add.length + ' 期：' + add.map(r => `${r.d}（${r.no}）${r.n.join(' ')} 特 ${r.s}`).join('、') : '六合彩沒有新資料');
   } finally {
     lock.releaseLock();
@@ -186,7 +192,7 @@ function m6Sheet_(create) {
 function readMarkSix_() {
   const ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(M6_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 9).getDisplayValues()
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 16).getValues()
     .filter(r => r[0])
-    .map(r => ({ d: r[0].trim(), no: r[1].trim(), n: r.slice(2, 8).map(Number), s: Number(r[8]) }));
+    .map(r => ({ d: String(r[0]).trim(), no: String(r[1]).trim(), n: r.slice(2, 8).map(Number), s: Number(r[8]), p: r.slice(9, 16).map(v => Number(v) || 0) }));
 }

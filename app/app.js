@@ -6,7 +6,7 @@ const API = "https://script.google.com/macros/s/AKfycby_Za-SJp2fteT4vLspntfLjBp_
 // 兩種彩券（2026/10/11 加入香港六合彩）。N = 號碼總數、k = 每期統計幾個號碼（六合彩含特別號共 7 個）
 const GAMES = {
   "539": {id:"539", name:"今彩539", title:"539 尾數觀察站", N:39, k:5, url:API, cache:"t539_draws_v2"},
-  "m6":  {id:"m6", name:"香港六合彩", title:"六合彩 尾數觀察站", N:49, k:7, url:API+"?game=m6", cache:"t539_m6_v1"}
+  "m6":  {id:"m6", name:"香港六合彩", title:"六合彩 尾數觀察站", N:49, k:7, url:API+"?game=m6", cache:"t539_m6_v2"}
 };
 const GAME_KEY = "t539_game";
 let G = GAMES["539"];
@@ -20,6 +20,8 @@ const GROUPS = {
   help: [["howto","使用教學"],["faq","常見問題"]],
   data: [["data","資料"]]
 };
+const M6_HIDE = ["sig","track"];   // 六合彩還沒有的分頁
+const subsOf = g => GROUPS[g].filter(([t])=>!(G.id==="m6" && M6_HIDE.includes(t)));
 const APP_URL = "https://bailixiao.github.io/539-app/app/";
 const NAV_KEY = "t539_nav";
 const ADMIN_KEY = "t539_admin";  // 管理者密碼只存在這支手機，按「登出」就清掉
@@ -35,7 +37,7 @@ try{ S.admin = localStorage.getItem(ADMIN_KEY) || ""; }catch(e){}
 function sortDraws(a){ return a.slice().sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0); }
 function valid(x){ return x && /^\d{4}-\d{2}-\d{2}$/.test(x.d) && Array.isArray(x.n) && x.n.length===G.k && x.n.every(v=>v>=1&&v<=G.N); }
 // 六合彩：統計用的 n 是 6 個主號加特別號（由小到大），另外保留 main（6 個主號）、s（特別號）、no（期號）給歷史頁
-function shape(x){ return G.id==="m6" ? {d:x.d, no:x.no, main:x.n, s:x.s, n:[...x.n, x.s].sort((p,q)=>p-q)} : x; }
+function shape(x){ return G.id==="m6" ? {d:x.d, no:x.no, main:x.n, s:x.s, p:x.p||[], n:[...x.n, x.s].sort((p,q)=>p-q)} : x; }
 
 function readCache(){
   try{ const r = JSON.parse(localStorage.getItem(G.cache)); return r && Array.isArray(r.draws) && r.draws.length ? r : null; }
@@ -83,7 +85,8 @@ function switchGame(id){
     else { S.draws=[]; S.source="loading"; S.fetchedAt=0; loadDraws(); }
   }
   try{ localStorage.setItem(GAME_KEY, id); }catch(e){}
-  if(id==="m6" && (S.group==="test" || S.group==="data")){ S.group="tail"; S.tab=S.last.tail||"dist"; }
+  if(id==="m6" && S.group==="data"){ S.group="tail"; S.tab=S.last.tail||"dist"; }
+  if(!subsOf(S.group).some(([t])=>t===S.tab)) S.tab=subsOf(S.group)[0][0];
   render();
 }
 
@@ -235,6 +238,7 @@ function viewTrend(){
 }
 
 function viewTest(){
+  if(G.id==="m6") return viewTestM6();
   const rp=S.randomPick;
   let html=`<div class="panel"><h2>隨機選號</h2>
     <p class="note">任何一組號碼中頭獎的機率都是 1/575,757，用統計選和隨機選一樣。</p>
@@ -358,6 +362,57 @@ function viewCombo(){
     <div class="panel"><div class="verdict">這頁最重要的觀念：「3:2 最常出」「和值 80–119 最常見」都是真的，但原因只是這些類別包含的號碼組合比較多。你買的永遠是「一組」號碼，任何一組中頭獎的機率都是 1/575,757，不管它是 3:2 還是 5:0。</div></div>`;
 }
 
+/* ---------- 六合彩：回測、期望值 ---------- */
+function viewTestM6(){
+  const rp=S.randomPick;
+  let html=`<div class="panel"><h2>隨機選號</h2>
+    <p class="note">六合彩一注選 6 個號碼，中頭獎的機率是 1/13,983,816，用統計選和隨機選一樣。</p>
+    <div class="picked">${rp?rp.map(ballHTML).join(""):""}</div>
+    <div class="btns"><button class="btn" data-act="rand">產生一組號碼</button></div></div>`;
+  if(!S.draws.length) return html+emptyHTML();
+  const t=S.test;
+  html+=`<div class="panel"><h2>策略回測</h2>
+    <p class="note">每一期只用「那一期之前」的資料選 6 個號碼（一注 10 元），再對當期開獎，從第 101 期一路跑到最新一期。中獎金額用賽馬會當期實際公布的派彩。</p>
+    <p class="note">追熱尾／追冷尾：前 20 期最熱／最冷的 6 個尾數各挑 1 號。雙冷尾：近 30 × 近 100 交叉比對最冷的 6 個尾數。追熱號／追冷號：前 30 期出現最多／最少的 6 個號碼。追遺漏號：當時最久沒開的 6 個號碼。連莊：直接買上一期的 6 個主號。隨機：亂數。統計冷熱時含特別號。</p>`;
+  if(!t){ html+=`<div class="btns"><button class="btn" data-act="test">開始回測</button></div></div>`; return html; }
+  if(t==="few"){ html+=`<p class="msg err">資料至少要 130 期才能回測。</p></div>`; return html; }
+  const row=(name,s)=>`<tr><td>${name}</td><td><span class="n">${(s.h/t.n).toFixed(3)}</span></td><td><span class="n">${(s.h3/t.n*100).toFixed(1)}%</span></td><td><span class="n">${(s.h4/t.n*100).toFixed(2)}%</span></td><td><span class="n">${(s.pay/(t.n*10)*100).toFixed(0)}%</span></td></tr>`;
+  html+=`<div class="scroll"><table><thead><tr><th>策略</th><th>平均中幾個</th><th>中 3+（有獎）</th><th>中 4+</th><th>回收率</th></tr></thead><tbody>
+    ${STRATS_M6.map(([k,name])=>row(name,t.st[k])).join("")}
+    <tr class="theo"><td>理論值</td><td><span class="n">0.735</span></td><td><span class="n">1.9%</span></td><td><span class="n">0.10%</span></td><td><span class="n">${(evTableM6(S.draws).ev*10).toFixed(0)}%</span></td></tr></tbody></table></div>
+    <p class="note">「中幾個」只算 6 個主號。中 3 個主號以上就有獎（七獎 40 元起）。</p>
+    <div class="verdict">共回測 ${t.n} 期，每期每種策略買一注 10 元。所有策略如果都在理論值附近上下跳動，就代表用歷史資料選號沒有比亂數厲害。回收率波動非常大：中一次五獎（4 個，640 元）就等於 64 期的本金，中一次三獎（5 個，約 6 萬元）會讓回收率一下子變成好幾倍，這是運氣不是策略。</div>
+    <div class="btns"><button class="btn ghost" data-act="test">重新回測</button></div></div>`;
+  return html;
+}
+function viewEVM6(){
+  const L=S.draws; if(!L.length) return emptyHTML();
+  const {rows:pr, ev}=evTableM6(L);
+  const fmt=v=>Math.round(v).toLocaleString();
+  const rows=pr.map((x,i)=>`<tr><td>${x.name}</td><td>${x.cond}</td><td><span class="n">1/${Math.round(M6_TOTAL/x.c).toLocaleString()}</span></td><td><span class="n">${fmt(x.p)}${i<3?"*":""}</span></td><td><span class="n">${x.e.toFixed(2)}</span></td></tr>`).join("");
+  const perYr=Math.round(L.length/((Date.parse(L[L.length-1].d)-Date.parse(L[0].d))/(365.25*864e5)));
+  const per=S.evPer, cost=per*10*perYr;
+  let html=`<div class="panel"><h2>每注期望值</h2>
+    <p class="note">一注 10 元（港幣）。期望值 = 每個獎項的「中獎機率 × 派彩」加起來。頭獎到三獎每期金額不同，用近 ${L.length} 期賽馬會公布的實際派彩平均；四獎到七獎是固定金額。</p>
+    <div class="scroll"><table class="ev6"><thead><tr><th>獎項</th><th>條件</th><th>機率</th><th>派彩</th><th>期望值</th></tr></thead><tbody>${rows}
+    <tr class="theo"><td colspan="4">合計</td><td><span class="n">${ev.toFixed(2)}</span></td></tr></tbody></table></div>
+    <p class="note">* 頭獎到三獎是有人中的那幾期的平均。頭獎常常沒人中（彩金累積到下一期），有人中時金額就很大，所以平均很高。「條件」裡的「特別號」是指特別號剛好在你選的 6 個號碼裡。</p>
+    <div class="verdict warn">每注 10 元，平均只拿回約 ${ev.toFixed(2)} 元，回收率約 ${(ev*10).toFixed(0)}%。也就是說，長期每買 100 元，平均會虧掉約 ${(100-ev*10).toFixed(0)} 元。中任何獎的機率加起來約 1/54。</div></div>`;
+  html+=`<div class="panel"><h2>一年會花多少</h2>
+    <div class="range">每期買 <select id="evPer">${[1,2,5,10].map(v=>`<option value="${v}" ${v===per?"selected":""}>${v} 注</option>`).join("")}</select>，一年約 ${perYr} 期</div>
+    <div class="kpis"><div><span>一年花費</span><b>${cost.toLocaleString()}</b></div><div><span>平均拿回</span><b>${Math.round(per*perYr*ev).toLocaleString()}</b></div><div><span>平均淨虧</span><b class="neg">${Math.round(cost-per*perYr*ev).toLocaleString()}</b></div></div>
+    <p class="note">金額都是港幣。</p></div>`;
+  const e=S.ev;
+  html+=`<div class="panel"><h2>用真實開獎資料模擬</h2>
+    <p class="note">假設有 1,000 個人，每個人在過去 ${L.length} 期每期都買一注隨機號碼，用每期真實的開獎和派彩，看最後各賺賠多少（港幣）。</p>`;
+  if(!e) return html+`<div class="btns"><button class="btn" data-act="ev">開始模擬</button></div></div>`;
+  html+=`<div class="kpis"><div><span>每人花費</span><b>${e.cost.toLocaleString()}</b></div><div><span>中位數回收率</span><b>${((e.med+e.cost)/e.cost*100).toFixed(0)}%</b></div><div><span>最後賺錢的人</span><b>${e.win} / 1000</b></div></div>
+    <div class="kpis"><div><span>最好的人</span><b>${e.best>=0?"+":""}${e.best.toLocaleString()}</b></div><div><span>中位數</span><b class="neg">${e.med.toLocaleString()}</b></div><div><span>最差的人</span><b class="neg">${e.worst.toLocaleString()}</b></div></div>
+    <div class="verdict">1,000 人全部加起來平均回收率是 ${(e.avg*100).toFixed(0)}%${e.big?`（其中 ${e.big} 人中過三獎以上，把平均拉高）`:""}，但「一般人」看中位數：只拿回 ${((e.med+e.cost)/e.cost*100).toFixed(0)}%。期望值大部分是靠極少數人中大獎撐起來的，沒中大獎的人只靠四到七獎，拿回的比例很低。</div>
+    <div class="btns"><button class="btn ghost" data-act="ev">再模擬一次</button></div></div>`;
+  return html;
+}
+
 function viewComboM6(L){
   const T=theoryG(), N=L.length, A=comboCountsG(L);
   const ratio=[...Array(GK+1).keys()].map(k=>`${k}:${GK-k}`);
@@ -371,6 +426,7 @@ function viewComboM6(L){
 }
 
 function viewEV(){
+  if(G.id==="m6") return viewEVM6();
   const {rows:pr, pre}=evTable();
   const rows=pr.map(x=>`<tr><td>${x.name}</td><td>${x.cond}</td><td><span class="n">1/${Math.round(575757/x.c).toLocaleString()}</span></td><td><span class="n">${x.p.toLocaleString()}</span></td><td><span class="n">${x.e.toFixed(2)}</span></td></tr>`).join("");
   const per=S.evPer, yr=312, cost=per*50*yr;
@@ -431,7 +487,7 @@ function viewHowto(){
       <li>一打開 app 會先問「要看哪一種彩券」，按「今彩539」或「香港六合彩」</li>
       <li>進去之後，最上面的「539｜六合彩」按鈕可以隨時切換</li>
       <li>六合彩是 49 個號碼開 6 個加 1 個特別號（藍色球）；統計時 7 個號碼一起算</li>
-      <li>六合彩目前有尾數、號碼、歷史；回測、期望值、6中3 訊號之後才會加上</li>
+      <li>六合彩目前有尾數、號碼、歷史、選號回測、期望值；6中3 訊號之後才會加上</li>
     </ol>
     ${shot("hist_m6.png","六合彩開獎歷史的畫面")}</div>
 
@@ -486,6 +542,7 @@ const FAQ = [
   ["「6中3訊號」準嗎？可以照著買嗎？", `不準。這一頁是把網路影片「用 KD 線找支撐位反彈」的方法照做一遍，再用最近 30 期、150 期實際回測（包括第一版和「波峰預測」第二版）：兩版開出 6 中 3 的機率都沒有比隨機挑 6 個號碼高。KD 是股票的技術指標，樂透每期獨立抽球，沒有趨勢可言。隨便挑 6 個號碼，平均每 52 期本來就會遇到一次 6 中 3。`],
   ["「追蹤紀錄」跟「回測」有什麼不同？", `回測是拿過去的資料「事後」驗證，試的方法越多，越容易剛好有一種看起來很好。追蹤紀錄從 10/12 開始，每期用當時以前的資料先算好號碼、開獎後才對獎，規則固定不改，所以是比較公平的測試。要累積幾百期，結果才有意義。`],
   ["六合彩和 539 有什麼不同？", `今彩539 是 39 個號碼開 5 個；香港六合彩是 49 個號碼開 6 個，再加開 1 個特別號。這個 app 統計六合彩時，6 個主號加特別號共 7 個號碼一起算，所有理論值（平均次數、卡方門檻、遺漏機率等）都用 49 取 7 重新計算，不是套用 539 的數字。六合彩的資料來自香港賽馬會官方。`],
+  ["六合彩的期望值怎麼算？", `六合彩一注 10 元（港幣）。四獎到七獎是固定金額（9,600、640、320、40 元），頭獎到三獎每期依彩池分配、金額不同，app 用賽馬會公布的每期實際派彩平均。算出來每注平均只拿回約 5.5 元，回收率約 55%，跟 539 差不多。`],
   ["怎麼切換 539 和六合彩？", `一打開 app 會先讓你選；進去之後按最上面的「539｜六合彩」就能切換。兩種的資料都會存在手機裡，切換很快。`],
   ["為什麼尾 0 的次數特別少？", `尾 0 只有 10、20、30 三個號碼，其他尾數都有 4 個（例如尾 1 是 1、11、21、31），所以尾 0 本來就比較少出現。app 裡的排名和「雙冷」都已經校正過這一點。`],
   ["「卡方值」是什麼？", `用來判斷「實際次數跟理論值的差距，是不是運氣就能解釋」。低於門檻（尾數 16.9、單號 53.4）代表差距在正常範圍內，純屬運氣。`],
@@ -740,9 +797,8 @@ function render(){
   $("#latest").classList.toggle("m6", G.id==="m6");
   // 「資料」鍵只有管理者看得到；一般人從頁尾「管理者登入」進入
   $('#bnav [data-g="data"]').hidden=!S.admin || G.id!=="539";
-  $('#bnav [data-g="test"]').hidden=G.id!=="539";   // 六合彩的回測在下一階段才做
   $("#loginLink").hidden=!!S.admin || S.group==="data" || G.id!=="539";
-  const subs=GROUPS[S.group];
+  const subs=subsOf(S.group);
   $("#tabs").hidden=subs.length<2;
   $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
   document.querySelectorAll("#bnav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.g===S.group));
@@ -768,7 +824,7 @@ function loadNav(){
 }
 function go(group, tab){
   S.group=group;
-  S.tab=tab || (GROUPS[group].some(([t])=>t===S.last[group]) ? S.last[group] : GROUPS[group][0][0]);
+  S.tab=tab || (subsOf(group).some(([t])=>t===S.last[group]) ? S.last[group] : subsOf(group)[0][0]);
   S.last[group]=S.tab; saveNav(); render(); window.scrollTo({top:0});
 }
 
@@ -801,9 +857,9 @@ document.addEventListener("click", async e=>{
   else if(act==="logout"){ logout(); S.msg=""; go("tail"); }
   else if(act==="import"){ if(await runAdmin({action:"import", csv:S.csv.text})) S.csv=null; render(); }
   else if(act==="sigtest"){ if(typeof S.sigTest!=="number") runSigTest(); }
-  else if(act==="rand"){ S.randomPick=sample5(Math.random); render(); }
-  else if(act==="test"){ a.disabled=true; a.textContent="計算中…"; setTimeout(()=>{ S.test=backtest(S.draws)||"few"; render(); },30); }
-  else if(act==="ev"){ a.disabled=true; a.textContent="模擬中…"; setTimeout(()=>{ S.ev=simulateEV(S.draws); render(); },30); }
+  else if(act==="rand"){ S.randomPick=G.id==="m6"?sampleK(Math.random,6,49):sample5(Math.random); render(); }
+  else if(act==="test"){ a.disabled=true; a.textContent="計算中…"; setTimeout(()=>{ S.test=(G.id==="m6"?backtestM6(S.draws):backtest(S.draws))||"few"; render(); },30); }
+  else if(act==="ev"){ a.disabled=true; a.textContent="模擬中…"; setTimeout(()=>{ S.ev=G.id==="m6"?simulateEVM6(S.draws):simulateEV(S.draws); render(); },30); }
 });
 
 /* ---------- 下拉重新整理 ---------- */
@@ -840,7 +896,8 @@ G=GAMES[startGame]; S.game=startGame; setGame(G.N, G.k);
 if(!location.hash) $("#chooser").hidden=false;   // 一打開先選彩券
 const hashTab=hashParts[0]||"";
 for(const g in GROUPS) if(g!=="data" && GROUPS[g].some(([t])=>t===hashTab)){ S.group=g; S.tab=hashTab; }
-if((S.group==="data" && !S.admin) || (G.id==="m6" && (S.group==="test" || S.group==="data"))){ S.group="tail"; S.tab=GROUPS.tail[0][0]; }
+if((S.group==="data" && !S.admin) || (G.id==="m6" && S.group==="data")){ S.group="tail"; S.tab=GROUPS.tail[0][0]; }
+if(!subsOf(S.group).some(([t])=>t===S.tab)) S.tab=subsOf(S.group)[0][0];
 render();
 loadDraws();
 
