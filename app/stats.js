@@ -143,6 +143,7 @@ function backtest(L){
  * 配對：符合條件、cv 最小的前 30 組裡，挑兩組號碼不重複、cv 合計最小的，合成 6 個號碼。
  */
 const SIG_W = 150, SIG_TOP = 30;
+const SIG_WS = [30, 60, 150];   // 找規律可用的期數（2026/10/11 加入 30、60 期）
 const P_6IN3 = 11061/575757;   // 隨機 6 個號碼，一期開出其中 3 個以上的機率
 const P_3IN2 = 22050/575757;   // 隨機 3 個號碼，一期開出其中 2 個以上的機率
 let TRI = null;
@@ -171,8 +172,8 @@ function tripleHits(L){
 }
 function lowerBound(a,v){ let lo=0,hi=a.length; while(lo<hi){ const m=(lo+hi)>>1; if(a[m]<v) lo=m+1; else hi=m; } return lo; }
 // 站在第 i 期開獎前（只用 i 之前的資料）評估一組三球
-function evalTriple(h, i){
-  const lo=lowerBound(h,i-SIG_W), hi=lowerBound(h,i), m=hi-lo;
+function evalTriple(h, i, W=SIG_W){
+  const lo=lowerBound(h,i-W), hi=lowerBound(h,i), m=hi-lo;
   if(m<4) return null;
   let s=0, s2=0;
   for(let k=lo+1;k<hi;k++){ const d=h[k]-h[k-1]; s+=d; s2+=d*d; }
@@ -182,10 +183,10 @@ function evalTriple(h, i){
   return {m, mean, cv:sd/mean, g, K:Math.min(K,100)};
 }
 // 第 i 期的訊號：回傳 {a, b, six} 或 null（沒有符合條件的組合）
-function signalAt(L, i){
+function signalAt(L, i, W=SIG_W){
   const {list}=tripleIndex(), H=tripleHits(L), cand=[];
   for(let id=0;id<list.length;id++){
-    const e=evalTriple(H[id], i);
+    const e=evalTriple(H[id], i, W);
     if(e && e.K<20 && e.g>=0.8*e.mean && e.g<=1.2*e.mean) cand.push({id, t:list[id], ...e});
   }
   cand.sort((x,y)=>x.cv-y.cv||y.m-x.m||x.id-y.id);
@@ -206,18 +207,18 @@ function signalAt(L, i){
  * 目前位置：下一期（距上次波峰 g+1 期）跟預測週期的相對誤差越小越好。
  * 前 30 名裡挑兩組號碼不重複、誤差合計最小的，合成 6 個號碼。
  */
-function evalTripleV2(h, i){
-  const lo=lowerBound(h,i-SIG_W), hi=lowerBound(h,i), m=hi-lo;
+function evalTripleV2(h, i, W=SIG_W){
+  const lo=lowerBound(h,i-W), hi=lowerBound(h,i), m=hi-lo;
   if(m<4) return null;
   let wsum=0, wtot=0, mn=1e9, mx=0, s=0;
   for(let k=lo+1, w=1;k<hi;k++, w++){ const d=h[k]-h[k-1]; wsum+=d*w; wtot+=w; s+=d; mn=Math.min(mn,d); mx=Math.max(mx,d); }
   const mean=s/(m-1), amp=(mx-mn)/mean, pred=wsum/wtot, g=i-1-h[hi-1];
   return {m, mean, amp, pred, g, err:Math.abs(g+1-pred)/pred};
 }
-function signalAtV2(L, i){
+function signalAtV2(L, i, W=SIG_W){
   const {list}=tripleIndex(), H=tripleHits(L), cand=[];
   for(let id=0;id<list.length;id++){
-    const e=evalTripleV2(H[id], i);
+    const e=evalTripleV2(H[id], i, W);
     if(e && e.amp<=0.5) cand.push({id, t:list[id], ...e});
   }
   cand.sort((x,y)=>x.err-y.err||x.amp-y.amp||x.id-y.id);
@@ -247,7 +248,9 @@ const pay6 = k => k*(k>0?PRIZE[k-1]:0) + (6-k)*(k<6?PRIZE[Math.min(k,5)]:0);
 const SIG_BTS = [30, 150];
 function blankBT(L, start){
   const o=()=>({n:0,h:0,six:0,a32:0,pay:0,d3:[0,0,0,0]});
-  return {sig:o(), v2:o(), rand:o(), none:0, none2:0, from:L[start].d, to:L[L.length-1].d};
+  const r={rand:o(), from:L[start].d, to:L[L.length-1].d, none:{}};
+  for(const W of SIG_WS){ r["sig"+W]=o(); r["v2_"+W]=o(); }
+  return r;
 }
 // 記一期結果：six = 6 個號碼（沒訊號為 null），tris = 兩組三球
 function addBT(o, six, tris, m){
@@ -265,11 +268,11 @@ function* backtest6Steps(L){
     yield (i-start)/(L.length-start);
     const m=mset(L[i]), ws=SIG_BTS.filter(w=>i>=L.length-w).map(w=>res[w]);
     const rp=[]; while(rp.length<6){ const v=1+Math.floor(r()*39); if(!rp.includes(v)) rp.push(v); }
-    const s=signalAt(L,i), s2=signalAtV2(L,i);
+    const sigs={};
+    for(const W of SIG_WS){ sigs["sig"+W]=signalAt(L,i,W); sigs["v2_"+W]=signalAtV2(L,i,W); }
     for(const o of ws){
       addBT(o.rand, rp, [rp.slice(0,3), rp.slice(3)], m);
-      if(s) addBT(o.sig, s.six, [s.a.t, s.b.t], m); else o.none++;
-      if(s2) addBT(o.v2, s2.six, [s2.a.t, s2.b.t], m); else o.none2++;
+      for(const k in sigs){ const s=sigs[k]; if(s) addBT(o[k], s.six, [s.a.t, s.b.t], m); else o.none[k]=(o.none[k]||0)+1; }
     }
   }
   return res;
