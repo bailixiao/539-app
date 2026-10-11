@@ -5,7 +5,7 @@
 const puppeteer = require("puppeteer-core");
 const os = require("os"), path = require("path");
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const SHOTS = [["dist", "home"], ["cross", "cross"], ["num", "num"], ["ev", "ev"]];  // [分頁, 檔名]
+const SHOTS = [["dist", "home"], ["cross", "cross"], ["num", "num"], ["hist", "hist"], ["ev", "ev"]];  // [分頁, 檔名]
 
 (async () => {
   const b = await puppeteer.launch({executablePath: CHROME, headless: true,

@@ -9,6 +9,7 @@ const LS_KEY = "t539_draws_v2";
 const GROUPS = {
   tail: [["dist","分布"],["gap","遺漏"],["trend","走勢"],["cross","交叉比對"]],
   num:  [["num","單號冷熱"],["ngap","單號遺漏"],["rep","連莊"],["combo","組合特徵"]],
+  hist: [["hist","歷史"]],
   test: [["test","選號回測"],["ev","期望值"],["sig","6中3訊號"]],
   help: [["howto","使用教學"],["faq","常見問題"]],
   data: [["data","資料"]]
@@ -20,7 +21,7 @@ const ADMIN_KEY = "t539_admin";  // 管理者密碼只存在這支手機，按�
 const S = {
   group: "tail", tab: "dist", last: {}, range: 100, draws: [], source: "loading", fetchedAt: 0,
   randomPick: null, test: null, ev: null, evPer: 1,
-  btWin: 150, admin: "", csv: null, msg: "", msgErr: false, busy: false, refreshing: false
+  btWin: 150, histN: 100, admin: "", csv: null, msg: "", msgErr: false, busy: false, refreshing: false
 };
 try{ S.admin = localStorage.getItem(ADMIN_KEY) || ""; }catch(e){}
 
@@ -87,6 +88,15 @@ function dateLabel(s){ const d=new Date(s+"T00:00:00Z"); return `${d.getUTCMonth
 const $ = s => document.querySelector(s);
 const pad2 = v => String(v).padStart(2,"0");
 function ballHTML(v){ const s=pad2(v); return `<span class="ball">${s[0]}<b>${s[1]}</b></span>`; }
+function gballHTML(v){ return `<span class="gball">${pad2(v)}</span>`; }
+// 期別 = 民國年 × 1,000,000 + 當年第幾期（資料從 2024/1/1 起完整，所以可以照順序算）
+const PERIODS=new WeakMap();
+function periods(L){
+  let p=PERIODS.get(L); if(p) return p;
+  p=[]; let y="", k=0;
+  L.forEach(x=>{ const yy=x.d.slice(0,4); if(yy!==y){ y=yy; k=0; } k++; p.push(String((+yy-1911)*1000000+k)); });
+  PERIODS.set(L,p); return p;
+}
 function recent(){ return S.range==="all" ? S.draws : S.draws.slice(-S.range); }
 function fmtTime(t){ const d=new Date(t); return `${d.getMonth()+1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 function rangeHTML(){
@@ -210,20 +220,39 @@ function viewTest(){
 function viewNum(){
   const L=recent(); if(!L.length) return emptyHTML();
   const {E, arr, chi}=numStats(L);
-  const cells=arr.map(x=>{
-    const a=Math.min(Math.abs(x.z)/2.5,1)*70, col=x.z>=0?"var(--hot)":"var(--cold)";
-    const strong=Math.abs(x.z)>=1.5;
-    return `<div class="nc" style="background:color-mix(in srgb,${col} ${a.toFixed(0)}%,var(--soft));${strong?"color:#fff":""}"><b>${pad2(x.v)}</b><span>${x.o}</span></div>`;
+  const gaps=numGaps(S.draws), latest=S.draws[S.draws.length-1].n;
+  const maxO=Math.max(...arr.map(x=>x.o)), maxG=Math.max(...gaps.map(x=>x.cur));
+  const cells=arr.map((x,i)=>{
+    const g=gaps[i].cur;
+    return `<div class="hc${latest.includes(x.v)?" new":""}"><div class="gbox">${gballHTML(x.v)}</div>
+      <div class="hn"><span class="ho${x.o===maxO?" mx":""}">${x.o}</span><span class="hg${g===maxG?" mx":""}">${g}</span></div></div>`;
   }).join("");
   const s=arr.slice().sort((a,b)=>b.z-a.z);
   const li=a=>a.map(x=>`<div class="it"><span class="ns">${pad2(x.v)}</span><span>${x.o} 次</span><span class="n">z ${x.z>=0?"+":"−"}${Math.abs(x.z).toFixed(1)}</span></div>`).join("");
-  const ok=chi<53.4;
+  const ok=chi<53.4, n=L.length;
   return `<div class="panel"><h2>單號冷熱</h2>
-    <p class="note">每格是一個號碼，下方數字是出現次數。理論上每個號碼 ${E.toFixed(1)} 次。越紅越熱、越藍越冷，顏色深淺依 z 分數。</p>
-    ${rangeHTML()}<div class="ngrid">${cells}</div></div>
+    ${rangeHTML()}
+    <div class="hlegend"><span><b class="ho">紅色</b>：近 ${n} 期開出次數（平均 ${E.toFixed(1)} 次）</span><span><b class="hg">藍色</b>：已經幾期沒開（平均 ${((1-P_NUM)/P_NUM).toFixed(1)} 期）</span></div>
+    <div class="hgrid">${cells}</div>
+    <p class="note">框起來的是最新一期（${dateLabel(S.draws[S.draws.length-1].d)}）開出的號碼；紅底是開出最多次，藍底是最久沒開。「幾期沒開」不受統計範圍影響，一律從最新一期往回算。</p></div>
     <div class="panel"><div class="two"><div><h2>最熱 5 號</h2><div class="list">${li(s.slice(0,5))}</div></div>
     <div><h2>最冷 5 號</h2><div class="list">${li(s.slice(-5).reverse())}</div></div></div>
     <div class="verdict ${ok?"":"warn"}">39 個號碼的卡方值 ${chi.toFixed(1)}（門檻 53.4）。${ok?"冷熱差距在純隨機的範圍內。":"差距超過一般隨機波動，可以檢查資料，或是資料期數太少。"}單號切得比尾數細，每格的樣本更少，所以看起來會比尾數更「冷熱分明」，但那多半是雜訊。</div></div>`;
+}
+
+function viewHist(){
+  const L=S.draws; if(!L.length) return emptyHTML();
+  const P=periods(L), n=S.histN==="all"?L.length:Math.min(S.histN, L.length);
+  const opts=[[30,"最近 30 期"],[100,"最近 100 期"],[200,"最近 200 期"],["all","全部"]];
+  const rows=[];
+  for(let i=L.length-1;i>=L.length-n;i--){
+    const d=new Date(L[i].d+"T00:00:00Z");
+    rows.push(`<div class="hrow"><div class="hmeta"><span>${P[i]}</span><span>${L[i].d}（${WEEK[d.getUTCDay()]}）</span></div><div class="hballs">${L[i].n.map(gballHTML).join("")}</div></div>`);
+  }
+  return `<div class="panel hpanel"><div class="hhead"><h2>開獎歷史</h2>
+    <select id="histSel">${opts.map(([v,t])=>`<option value="${v}" ${String(S.histN)===String(v)?"selected":""}>${t}</option>`).join("")}</select></div>
+    <p class="note" style="padding:0 16px">號碼依大小排列。共 ${L.length} 期，從 ${L[0].d} 開始。</p>
+    <div class="hlist">${rows.join("")}</div></div>`;
 }
 
 function viewNgap(){
@@ -347,7 +376,7 @@ function viewHowto(){
   <div class="panel"><h2>3. 畫面怎麼看</h2>
     <ol class="steps">
       <li>最上面是「資料更新到哪一天」和最新一期的 5 個號碼</li>
-      <li>最下面有 4 個鍵：<b>尾數、號碼、回測、說明</b></li>
+      <li>最下面有 5 個鍵：<b>尾數、號碼、歷史、回測、說明</b></li>
       <li>每個鍵按下去，上方還有小按鈕可以切換頁面</li>
       <li>有些頁面可以選「統計範圍」，從近 10 期到近 200、300 期或全部</li>
     </ol>
@@ -360,12 +389,15 @@ function viewHowto(){
     <p class="note">遺漏：每個尾數幾期沒開了。走勢：近 60 期的熱冷圖。交叉比對：近 30 期和近 100 期都偏少的尾數，標為「雙冷」。</p>
     ${shot("cross.png","交叉比對頁的畫面")}
     <h3>號碼 › 單號冷熱、單號遺漏、連莊、組合特徵</h3>
-    <p class="note">39 個號碼各開幾次（越紅越熱、越藍越冷）、每個號碼已經幾期沒開、每期跟上期重複幾個、和值與奇偶大小比例。「單號遺漏」最上面會比對號碼和尾數的遺漏，兩個都很久沒開的號碼標為「雙遺漏」。</p>
+    <p class="note">單號冷熱用金色號碼球顯示，每顆球下面紅字是開出幾次、藍字是已經幾期沒開，框起來的是最新一期開出的號碼。另外還有每個號碼已經幾期沒開的排行、每期跟上期重複幾個、和值與奇偶大小比例。「單號遺漏」最上面會比對號碼和尾數的遺漏，兩個都很久沒開的號碼標為「雙遺漏」。</p>
     ${shot("num.png","單號冷熱頁的畫面")}
+    <h3>歷史</h3>
+    <p class="note">每一期的期別、日期、星期和 5 個號碼，可以選看最近 30、100、200 期或全部。</p>
+    ${shot("hist.png","開獎歷史頁的畫面")}
     <h3>回測 › 選號回測、期望值、6中3訊號</h3>
     <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球，各列出近 30 期、150 期中 1、2、3 個的次數），並用最近 30 期、150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
     ${shot("ev.png","期望值頁的畫面")}
-    <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("test","test","去看回測")}</div></div>
+    <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("hist","hist","去看歷史")}${goBtn("test","test","去看回測")}</div></div>
 
   <div class="panel"><h2>5. 資料更新</h2>
     <ol class="steps">
@@ -598,9 +630,10 @@ function render(){
   $("#tabs").hidden=subs.length<2;
   $("#tabs").innerHTML=subs.map(([t,name])=>`<button role="tab" data-t="${t}" aria-selected="${t===S.tab}">${name}</button>`).join("");
   document.querySelectorAll("#bnav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.g===S.group));
-  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,ngap:viewNgap,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,sig:viewSig,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
+  const v={dist:viewDist,gap:viewGap,trend:viewTrend,cross:viewCross,num:viewNum,ngap:viewNgap,hist:viewHist,rep:viewRep,combo:viewCombo,test:viewTest,ev:viewEV,sig:viewSig,howto:viewHowto,faq:viewFaq,data:viewData}[S.tab]();
   $("#view").innerHTML=v;
   const rs=$("#rangeSel"); if(rs) rs.onchange=e=>{ S.range=e.target.value==="all"?"all":+e.target.value; render(); };
+  const hs=$("#histSel"); if(hs) hs.onchange=e=>{ S.histN=e.target.value==="all"?"all":+e.target.value; render(); };
   const ep=$("#evPer"); if(ep) ep.onchange=e=>{ S.evPer=+e.target.value; render(); };
   const fi=$("#fileIn"); if(fi) fi.onchange=onFile;
   const lf=$("#loginForm"); if(lf) lf.onsubmit=onLogin;
