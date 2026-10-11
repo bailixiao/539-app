@@ -102,7 +102,7 @@ function periods(L){
 function recent(){ return S.range==="all" ? S.draws : S.draws.slice(-S.range); }
 function fmtTime(t){ const d=new Date(t); return `${d.getMonth()+1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 function rangeHTML(){
-  const opts=[[10,"近 10 期"],[15,"近 15 期"],[20,"近 20 期"],[25,"近 25 期"],[30,"近 30 期"],[100,"近 100 期"],[200,"近 200 期"],[300,"近 300 期"],["all","全部"]];
+  const opts=[[10,"近 10 期"],[15,"近 15 期"],[20,"近 20 期"],[25,"近 25 期"],[30,"近 30 期"],[40,"近 40 期"],[100,"近 100 期"],[200,"近 200 期"],[300,"近 300 期"],["all","全部"]];
   return `<div class="range">統計範圍 <select id="rangeSel">${opts.map(([v,t])=>`<option value="${v}" ${String(S.range)===String(v)?"selected":""}>${t}</option>`).join("")}</select></div>`;
 }
 function emptyHTML(){
@@ -245,7 +245,7 @@ function viewNum(){
 function viewHist(){
   const L=S.draws; if(!L.length) return emptyHTML();
   const P=periods(L), n=S.histN==="all"?L.length:Math.min(S.histN, L.length);
-  const opts=[[30,"最近 30 期"],[100,"最近 100 期"],[200,"最近 200 期"],["all","全部"]];
+  const opts=[[10,"最近 10 期"],[20,"最近 20 期"],[30,"最近 30 期"],[40,"最近 40 期"],[100,"最近 100 期"],[200,"最近 200 期"],["all","全部"]];
   const rows=[];
   for(let i=L.length-1;i>=L.length-n;i--){
     const d=new Date(L[i].d+"T00:00:00Z");
@@ -394,7 +394,7 @@ function viewHowto(){
     <p class="note">單號冷熱用金色號碼球顯示，每顆球下面紅字是開出幾次、藍字是已經幾期沒開，框起來的是最新一期開出的號碼。另外還有每個號碼已經幾期沒開的排行、每期跟上期重複幾個、和值與奇偶大小比例。「單號遺漏」最上面會比對號碼和尾數的遺漏，兩個都很久沒開的號碼標為「雙遺漏」。</p>
     ${shot("num.png","單號冷熱頁的畫面")}
     <h3>歷史</h3>
-    <p class="note">每一期的期別、日期、星期和 5 個號碼，可以選看最近 30、100、200 期或全部。</p>
+    <p class="note">每一期的期別、日期、星期和 5 個號碼，可以選看最近 10、20、30、40、100、200 期或全部。</p>
     ${shot("hist.png","開獎歷史頁的畫面")}
     <h3>回測 › 選號回測、期望值、6中3訊號</h3>
     <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球，各列出近 30 期、150 期中 1、2、3 個的次數，另列前 10 名候選組合），並用最近 30 期、150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
