@@ -71,4 +71,5 @@
 - 每晚 539 的 dailyUpdate 跑完後，會順便執行 dailyMarkSix 抓最近 10 期，試算表沒有的補進去。
 - 第一次（工作表還沒有資料時），dailyMarkSix 會自動執行 importMarkSixHistory，從 2024/1/1 起匯入全部歷史。
 - 想手動檢查：Apps Script 函式選 testMarkSix → 執行，記錄會顯示抓到的最新三期。
+- 當晚更新：另外有一個每天晚上 10–11 點執行 dailyMarkSix 的觸發器（用 setupMarkSixTrigger 建立，執行一次即可，重複執行不會多建）。
 - 資料網址：原本的 /exec 網址後面加 `?game=m6`。

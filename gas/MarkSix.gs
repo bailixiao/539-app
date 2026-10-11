@@ -167,6 +167,16 @@ function dailyMarkSix() {
 }
 
 
+// ===== 建立每晚 10–11 點的六合彩觸發器（手動執行一次；已經有就不會重複建立） =====
+
+function setupMarkSixTrigger() {
+  const exists = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'dailyMarkSix');
+  if (exists) { console.log('已經有 dailyMarkSix 的觸發器，不用再建立'); return; }
+  ScriptApp.newTrigger('dailyMarkSix').timeBased().everyDays(1).atHour(22).inTimezone('Asia/Taipei').create();
+  console.log('已建立觸發器：每天晚上 10–11 點執行 dailyMarkSix');
+}
+
+
 // ===== 測試用（不會寫入） =====
 
 function testMarkSix() {
