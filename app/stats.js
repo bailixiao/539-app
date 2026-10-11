@@ -197,7 +197,7 @@ function signalAt(L, i){
     if(!best || sc<best.sc) best={sc, a:top[p], b:top[q]};
   }
   if(!best) return null;
-  return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length};
+  return {a:best.a, b:best.b, six:[...best.a.t, ...best.b.t].sort((x,y)=>x-y), candidates:cand.length, top10:cand.slice(0,10)};
 }
 /* 第二版（2026/10/11 新增，依另一個 AI 建議的「波峰／波谷／週期振幅／週期預測」具體化）：
  * 每次 3 中 2 命中 = 波峰，兩個波峰之間 = 一個週期。

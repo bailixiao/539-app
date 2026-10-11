@@ -397,7 +397,7 @@ function viewHowto(){
     <p class="note">每一期的期別、日期、星期和 5 個號碼，可以選看最近 30、100、200 期或全部。</p>
     ${shot("hist.png","開獎歷史頁的畫面")}
     <h3>回測 › 選號回測、期望值、6中3訊號</h3>
-    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球，各列出近 30 期、150 期中 1、2、3 個的次數），並用最近 30 期、150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
+    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球，各列出近 30 期、150 期中 1、2、3 個的次數，另列前 10 名候選組合），並用最近 30 期、150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
     ${shot("ev.png","期望值頁的畫面")}
     <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("hist","hist","去看歷史")}${goBtn("test","test","去看回測")}</div></div>
 
@@ -493,7 +493,7 @@ function viewSig(){
       ${triDistHTML(L, g.t)}
       ${sigChart(hitSeries(L, g.t, 2, SIG_W))}</div>`;
   };
-  html+=grp("組 A", s.a)+grp("組 B", s.b);
+  html+=grp("組 A", s.a)+grp("組 B", s.b)+topHTML(s);
   return html+sigMethodHTML()+sigTestHTML();
 }
 // 三個號碼近 30 期、近 150 期各中 1／2／3 個幾次，跟隨機的平均次數比
@@ -502,6 +502,16 @@ function triDistHTML(L, t){
     return `<tr><td>近 ${n} 期</td>${[1,2,3].map(k=>`<td><span class="n">${c[k]} 次</span><small class="avg">平均 ${(P_TRI[k]*n).toFixed(k===3?2:1)}</small></td>`).join("")}</tr>`; }).join("");
   return `<div class="scroll"><table class="tri"><thead><tr><th>範圍</th><th>中 1 個</th><th>中 2 個</th><th>中 3 個</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="note">「平均」是隨機挑三個號碼，同樣期數平均會中幾次。</p>`;
+}
+// 前 10 名候選組合（第一版的排名）
+function topHTML(s){
+  const tag=x=>x.id===s.a.id?'<span class="tag dtag">組 A</span>':x.id===s.b.id?'<span class="tag dtag">組 B</span>':"";
+  const rows=s.top10.map((x,i)=>`<tr><td><span class="n">${i+1}</span></td><td><div class="dcell">${sballs(x.t)}${tag(x)}</div></td>
+    <td><span class="n">${x.cv.toFixed(3)}</span><small class="avg">中 ${x.m} 次</small></td><td><span class="n">${x.mean.toFixed(1)}</span></td><td><span class="n">${x.g}</span></td></tr>`).join("");
+  return `<div class="panel"><h2>前 10 名候選組合</h2>
+    <p class="note">目前有 ${s.candidates} 組三球符合「間隔穩定、目前在低點」的條件，這裡列出規律度最小的前 10 名。「平均間隔」和「已沒中」的單位都是期。組 A、組 B 是其中號碼不重複、規律度合計最小的兩組。</p>
+    <div class="scroll"><table class="tri top10"><thead><tr><th>#</th><th>三個號碼</th><th>規律度</th><th>平均間隔</th><th>已沒中</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="verdict">名次只代表「過去 ${SIG_W} 期的間隔有多整齊」，不是機率高低。這 ${s.candidates} 組裡任何一組，下一期中 2 個以上的機率都一樣是 ${(P_3IN2*100).toFixed(1)}%。很多組只中過 4 次，次數少，間隔剛好差不多的機會本來就大。</div></div>`;
 }
 function sigMethodHTML(){
   return `<div class="panel"><h2>怎麼算的</h2>
