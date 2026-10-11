@@ -5,8 +5,14 @@
  */
 
 const C395 = 575757;
-const P_TAIL = d => d === 0 ? 1 - 376992/C395 : 1 - 324632/C395; // 某尾數在一期中至少出現一次的機率
-const K = d => d === 0 ? 3 : 4; // 每個尾數有幾個號碼
+/* 遊戲參數（2026/10/11 加入香港六合彩）：GN = 號碼總數、GK = 每期統計幾個號碼。
+ * 539：39 個號碼、每期 5 個。六合彩：49 個號碼、每期 6 個主號 + 1 個特別號 = 7 個。
+ * 539 的計算式維持原本的寫法與順序，所以結果跟原版完全一樣。 */
+let GN = 39, GK = 5;
+function comb(n,k){ if(k<0||k>n) return 0; let r=1; for(let i=0;i<k;i++) r=r*(n-i)/(i+1); return Math.round(r); }
+function setGame(N,k){ GN=N; GK=k; P_NUM=GK/GN; }
+const P_TAIL = d => GN===39 ? (d === 0 ? 1 - 376992/C395 : 1 - 324632/C395) : 1 - comb(GN-K(d),GK)/comb(GN,GK); // 某尾數在一期中至少出現一次的機率
+const K = d => GN===39 ? (d === 0 ? 3 : 4) : Math.floor((GN-d)/10) + (d===0?0:1); // 每個尾數有幾個號碼
 
 /* ---------- 亂數 ---------- */
 function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
@@ -18,7 +24,7 @@ function tailCounts(list){ const c=Array(10).fill(0); list.forEach(x=>x.n.forEac
 // 尾數分布：次數、理論值、卡方值（門檻 16.92）
 function tailDist(list){
   const c=tailCounts(list), N=list.length;
-  const exp=c.map((_,d)=>N*5*K(d)/39);
+  const exp=c.map((_,d)=>N*GK*K(d)/GN);
   let chi=0; c.forEach((o,d)=>chi+=(o-exp[d])**2/exp[d]);
   return {c, exp, chi};
 }
@@ -42,7 +48,7 @@ const numsOfTail = d => { const a=[]; for(let v=1;v<=39;v++) if(v%10===d) a.push
 function crossRank(list){
   const c=tailCounts(list), N=list.length;
   // z 分數：每期 5 球中某尾數的顆數是超幾何分布，變異數 = 5·p·(1-p)·34/38
-  const r=c.map((o,d)=>{ const p=K(d)/39, E=N*5*p, sd=Math.sqrt(N*5*p*(1-p)*34/38);
+  const r=c.map((o,d)=>{ const p=K(d)/GN, E=N*GK*p, sd=Math.sqrt(N*GK*p*(1-p)*(GN-GK)/(GN-1));
     return {d,o,E,dev:(o-E)/E,z:(o-E)/sd}; });
   const order=r.slice().sort((a,b)=>a.z-b.z).map(x=>x.d); // 冷 → 熱
   r.forEach(x=>x.rank=order.indexOf(x.d)+1);
@@ -75,21 +81,21 @@ const isDualHot = r => r.a.rank>=8&&r.b.rank>=8;
 
 /* ---------- 單號冷熱 ---------- */
 function numStats(L){
-  const N=L.length, E=N*5/39, sd=Math.sqrt(N*(5/39)*(34/39));
-  const cnt=Array(40).fill(0); L.forEach(x=>x.n.forEach(v=>cnt[v]++));
+  const N=L.length, E=N*GK/GN, sd=Math.sqrt(N*(GK/GN)*((GN-GK)/GN));
+  const cnt=Array(GN+1).fill(0); L.forEach(x=>x.n.forEach(v=>cnt[v]++));
   const arr=[]; let chi=0;
-  for(let v=1;v<=39;v++){ const z=(cnt[v]-E)/sd; arr.push({v,o:cnt[v],z}); chi+=(cnt[v]-E)**2/E; }
-  chi*=38/34; // 每期 5 球不重複，修正成近似卡方
+  for(let v=1;v<=GN;v++){ const z=(cnt[v]-E)/sd; arr.push({v,o:cnt[v],z}); chi+=(cnt[v]-E)**2/E; }
+  chi*=(GN-1)/(GN-GK); // 每期開出的號碼不重複，修正成近似卡方
   return {E, arr, chi};
 }
 
 /* ---------- 單號遺漏 ---------- */
 // 每個號碼：目前連續幾期沒開、歷史最長幾期沒開、最後一次開出日期
 // 每期某個號碼開出的機率 = 5/39；平均遺漏 = (1-p)/p ≈ 6.8 期
-const P_NUM = 5/39;
+let P_NUM = 5/39;
 function numGaps(L){
   const res=[];
-  for(let v=1; v<=39; v++){
+  for(let v=1; v<=GN; v++){
     let run=0, longest=0, last=null;
     for(let i=0;i<L.length;i++){
       if(L[i].n.includes(v)){ longest=Math.max(longest,run); run=0; last=L[i].d; } else run++;
@@ -103,7 +109,7 @@ function numGaps(L){
 /* ---------- 中幾號 ---------- */
 const PRIZE=[0,0,50,300,20000,8000000];
 const MEM=new WeakMap();
-function mset(x){ let m=MEM.get(x); if(!m){ m=new Uint8Array(40); x.n.forEach(v=>m[v]=1); MEM.set(x,m); } return m; }
+function mset(x){ let m=MEM.get(x); if(!m){ m=new Uint8Array(50); x.n.forEach(v=>m[v]=1); MEM.set(x,m); } return m; }
 function hits(pick,x){ const m=mset(x); let h=0; for(const v of pick) h+=m[v]; return h; }
 
 /* ---------- 選號回測 ---------- */
@@ -313,8 +319,10 @@ function hitSeries(L, nums, need, n){
 
 /* ---------- 連莊 ---------- */
 const REP_THEO=[278256,231880,59840,5610,170,1].map(c=>c/575757);
+// 連莊理論值：上一期 GK 個號碼裡，這一期又開出 j 個的機率（超幾何分布）
+function repTheo(){ return GN===39 ? REP_THEO : [...Array(GK+1).keys()].map(j=>comb(GK,j)*comb(GN-GK,GK-j)/comb(GN,GK)); }
 function repeatStats(L){
-  const ks=Array(6).fill(0); let sum=0;
+  const ks=Array(GK+1).fill(0); let sum=0;
   for(let i=1;i<L.length;i++){ const k=hits(L[i-1].n,L[i]); ks[k]++; sum+=k; }
   const n=L.length-1;
   return {ks, n, mean:sum/n};
@@ -338,6 +346,34 @@ function theory(){
   }
   for(const k in T) T[k]=T[k].map(c=>c/575757);
   return THEO=T;
+}
+const SUM_LABELS_M6=["≤139","140–159","160–179","180–199","200–219","≥220"];
+const sumBinM6=s=>s<140?0:s<160?1:s<180?2:s<200?3:s<220?4:5;
+const BIG_FROM = () => GN===39 ? 20 : 25;   // 大號：539 是 20–39，六合彩是 25–49
+function featsG(n){
+  let s=0,odd=0,big=0,pairs=0; const b=BIG_FROM();
+  for(let j=0;j<n.length;j++){ s+=n[j]; if(n[j]%2) odd++; if(n[j]>=b) big++; if(j&&n[j]-n[j-1]===1) pairs++; }
+  return {sum:sumBinM6(s), odd, big, cons:Math.min(pairs,2)};
+}
+let THEO_G=null;
+function theoryG(){
+  if(THEO_G && THEO_G.N===GN && THEO_G.k===GK) return THEO_G;
+  const tot=comb(GN,GK), T={N:GN,k:GK,sum:Array(6).fill(0),odd:Array(GK+1).fill(0),big:Array(GK+1).fill(0),cons:Array(3).fill(0)};
+  // 和值：動態規劃 dp[j][s] = 選 j 個號碼、總和 s 的組合數
+  const maxS=GN*GK; let dp=[...Array(GK+1)].map(()=>new Float64Array(maxS+1)); dp[0][0]=1;
+  for(let v=1;v<=GN;v++) for(let j=Math.min(GK,v);j>=1;j--) for(let s=maxS;s>=v;s--) dp[j][s]+=dp[j-1][s-v];
+  for(let s=0;s<=maxS;s++) if(dp[GK][s]) T.sum[sumBinM6(s)]+=dp[GK][s];
+  const nOdd=Math.ceil(GN/2), nBig=GN-BIG_FROM()+1;
+  for(let j=0;j<=GK;j++){ T.odd[j]=comb(nOdd,j)*comb(GN-nOdd,GK-j); T.big[j]=comb(nBig,j)*comb(GN-nBig,GK-j); }
+  // 連號：剛好 j 組相鄰的組合數 = C(GK−1, j) × C(GN−GK+1, GK−j)
+  for(let j=0;j<GK;j++) T.cons[Math.min(j,2)]+=comb(GK-1,j)*comb(GN-GK+1,GK-j);
+  for(const k of ["sum","odd","big","cons"]) T[k]=T[k].map(c=>c/tot);
+  return THEO_G=T;
+}
+function comboCountsG(L){
+  const A={sum:Array(6).fill(0),odd:Array(GK+1).fill(0),big:Array(GK+1).fill(0),cons:Array(3).fill(0)};
+  L.forEach(x=>{ const f=featsG(x.n); A.sum[f.sum]++; A.odd[f.odd]++; A.big[f.big]++; A.cons[f.cons]++; });
+  return A;
 }
 function comboCounts(L){
   const A={sum:Array(6).fill(0),odd:Array(6).fill(0),big:Array(6).fill(0),cons:Array(3).fill(0)};
