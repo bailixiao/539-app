@@ -20,7 +20,7 @@ const ADMIN_KEY = "t539_admin";  // 管理者密碼只存在這支手機，按�
 const S = {
   group: "tail", tab: "dist", last: {}, range: 100, draws: [], source: "loading", fetchedAt: 0,
   randomPick: null, test: null, ev: null, evPer: 1,
-  admin: "", csv: null, msg: "", msgErr: false, busy: false, refreshing: false
+  btWin: 150, admin: "", csv: null, msg: "", msgErr: false, busy: false, refreshing: false
 };
 try{ S.admin = localStorage.getItem(ADMIN_KEY) || ""; }catch(e){}
 
@@ -363,7 +363,7 @@ function viewHowto(){
     <p class="note">39 個號碼各開幾次（越紅越熱、越藍越冷）、每個號碼已經幾期沒開、每期跟上期重複幾個、和值與奇偶大小比例。「單號遺漏」最上面會比對號碼和尾數的遺漏，兩個都很久沒開的號碼標為「雙遺漏」。</p>
     ${shot("num.png","單號冷熱頁的畫面")}
     <h3>回測 › 選號回測、期望值、6中3訊號</h3>
-    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球，各列出近 150 期中 1、2、3 個的次數），並用最近 150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
+    <p class="note">用過去的資料試 8 種選號方法（包括追熱、追冷、追遺漏），看有沒有比亂選厲害；以及每買一注平均能拿回多少錢。「6中3訊號」照網路影片的 KD 方法算出 6 個號碼（兩組三球，各列出近 30 期、150 期中 1、2、3 個的次數），並用最近 30 期、150 期回測它有沒有用（另有依波峰預測的第二版）。</p>
     ${shot("ev.png","期望值頁的畫面")}
     <div class="btns">${goBtn("tail","dist","去看尾數")}${goBtn("num","num","去看號碼")}${goBtn("test","test","去看回測")}</div></div>
 
@@ -389,7 +389,7 @@ const FAQ = [
   ["iPhone 找不到「加入主畫面」？", `要用 Safari 打開才有這個選項。從 LINE 點開的話，先按 LINE 畫面右上或右下角的選單，選「用 Safari 開啟」或「用預設瀏覽器開啟」，再按分享鈕。`],
   ["「冷熱」和「遺漏」有什麼不同？", `冷熱看的是一段期間「總共開幾次」，遺漏看的是從最新一期往回數「連續幾期沒開」。例如某個號碼近 100 期開了 10 次，但如果都集中在前面，最近可能已經 40 幾期沒開。「號碼 › 單號遺漏」看每個號碼，「尾數 › 遺漏」看每個尾數。`],
   ["「雙遺漏」是什麼？要特別買嗎？", `號碼本身超過 20 期沒開，而且它的尾數也超過平均 3 倍沒開（尾 0 是 6 期以上，其他尾數 4 期以上），就標為「雙遺漏」。這只是觀察，不代表比較會開。「回測」裡的「追遺漏號」策略就是每期買最久沒開的 5 個號碼，用過去 700 多期實際跑的結果，跟亂選差不多。`],
-  ["「6中3訊號」準嗎？可以照著買嗎？", `不準。這一頁是把網路影片「用 KD 線找支撐位反彈」的方法照做一遍，再用最近 150 期實際回測（包括第一版和「波峰預測」第二版）：兩版開出 6 中 3 的機率都沒有比隨機挑 6 個號碼高。KD 是股票的技術指標，樂透每期獨立抽球，沒有趨勢可言。隨便挑 6 個號碼，平均每 52 期本來就會遇到一次 6 中 3。`],
+  ["「6中3訊號」準嗎？可以照著買嗎？", `不準。這一頁是把網路影片「用 KD 線找支撐位反彈」的方法照做一遍，再用最近 30 期、150 期實際回測（包括第一版和「波峰預測」第二版）：兩版開出 6 中 3 的機率都沒有比隨機挑 6 個號碼高。KD 是股票的技術指標，樂透每期獨立抽球，沒有趨勢可言。隨便挑 6 個號碼，平均每 52 期本來就會遇到一次 6 中 3。`],
   ["為什麼尾 0 的次數特別少？", `尾 0 只有 10、20、30 三個號碼，其他尾數都有 4 個（例如尾 1 是 1、11、21、31），所以尾 0 本來就比較少出現。app 裡的排名和「雙冷」都已經校正過這一點。`],
   ["「卡方值」是什麼？", `用來判斷「實際次數跟理論值的差距，是不是運氣就能解釋」。低於門檻（尾數 16.9、單號 53.4）代表差距在正常範圍內，純屬運氣。`],
   ["「z 分數」和「雙冷」是什麼？", `z 分數 = 跟理論值差多少 ÷ 正常會晃動的幅度。z 在 ±2 以內算正常晃動。「雙冷」是近 30 期和近 100 期都排在最冷 3 名的尾數。因為近 30 期本來就包含在近 100 期裡，雙冷不代表下一期比較會開。`],
@@ -462,12 +462,12 @@ function viewSig(){
   html+=grp("組 A", s.a)+grp("組 B", s.b);
   return html+sigMethodHTML()+sigTestHTML();
 }
-// 三個號碼近 SIG_W 期中 1／2／3 個各幾次，跟隨機的理論次數比
+// 三個號碼近 30 期、近 150 期各中 1／2／3 個幾次，跟隨機的平均次數比
 function triDistHTML(L, t){
-  const c=hitDist(L, t, SIG_W), n=Math.min(SIG_W, L.length);
-  return `<div class="scroll"><table><thead><tr><th>近 ${n} 期</th><th>中 1 個</th><th>中 2 個</th><th>中 3 個</th></tr></thead><tbody>
-    <tr><td>實際</td>${[1,2,3].map(k=>`<td><span class="n">${c[k]} 次</span></td>`).join("")}</tr>
-    <tr class="theo"><td>隨機平均</td>${[1,2,3].map(k=>`<td><span class="n">${(P_TRI[k]*n).toFixed(k===3?2:1)} 次</span></td>`).join("")}</tr></tbody></table></div>`;
+  const rows=[30, SIG_W].map(w=>{ const n=Math.min(w, L.length), c=hitDist(L, t, n);
+    return `<tr><td>近 ${n} 期</td>${[1,2,3].map(k=>`<td><span class="n">${c[k]} 次</span><small class="avg">平均 ${(P_TRI[k]*n).toFixed(k===3?2:1)}</small></td>`).join("")}</tr>`; }).join("");
+  return `<div class="scroll"><table class="tri"><thead><tr><th>範圍</th><th>中 1 個</th><th>中 2 個</th><th>中 3 個</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">「平均」是隨機挑三個號碼，同樣期數平均會中幾次。</p>`;
 }
 function sigMethodHTML(){
   return `<div class="panel"><h2>怎麼算的</h2>
@@ -488,21 +488,23 @@ function sigMethodHTML(){
     <div class="verdict warn">KD 是股票的技術指標，股價有買賣雙方、前後有關係；樂透每期獨立抽球，沒有趨勢或支撐位。圖上的「規律」是從 9,139 組裡挑出看起來最整齊的，事後挑出來的規律不會延續到下一期。</div></div>`;
 }
 function sigTestHTML(){
-  const t=S.sigTest;
+  const all=S.sigTest;
   let html=`<div class="panel"><h2>回測：這個方法有沒有用？</h2>
-    <p class="note">回測最近 ${SIG_BT} 期：每一期都只用「那一期之前」的 ${SIG_W} 期資料，照第一版、第二版的方法各算出 6 個號碼，再對當期開獎；同時每期也隨機挑 6 個號碼比較。包牌 = 6 個號碼買滿 6 注，每期 300 元。</p>`;
-  if(!t) return html+`<div class="btns"><button class="btn" data-act="sigtest">開始回測</button></div><p class="note">手機大約要幾秒到十幾秒。</p></div>`;
-  if(typeof t==="number") return html+`<div class="btns"><button class="btn" disabled>計算中… ${Math.round(t*100)}%</button></div></div>`;
-  const row=(name,o)=>`<tr><td>${name}</td><td><span class="n">${(o.six/o.n*100).toFixed(2)}%</span></td><td><span class="n">${(o.h/o.n).toFixed(3)}</span></td><td><span class="n">${(o.pay/(o.n*300)*100).toFixed(0)}%</span></td></tr>`;
-  html+=`<div class="scroll"><table><thead><tr><th>選法</th><th>6 中 3</th><th>平均中幾個</th><th>包牌回收率</th></tr></thead><tbody>
+    <p class="note">每一期都只用「那一期之前」的 ${SIG_W} 期資料，照第一版、第二版的方法各算出 6 個號碼，再對當期開獎；同時每期也隨機挑 6 個號碼比較。可以切換看最近 30 期或最近 150 期。包牌 = 6 個號碼買滿 6 注，每期 300 元。</p>`;
+  if(!all) return html+`<div class="btns"><button class="btn" data-act="sigtest">開始回測</button></div><p class="note">手機大約要幾秒到十幾秒。</p></div>`;
+  if(typeof all==="number") return html+`<div class="btns"><button class="btn" disabled>計算中… ${Math.round(all*100)}%</button></div></div>`;
+  const w=S.btWin, t=all[w];
+  const row=(name,o)=>`<tr><td>${name}</td><td><span class="n">${o.six} 次</span><small class="avg">${(o.six/o.n*100).toFixed(1)}%</small></td><td><span class="n">${(o.h/o.n).toFixed(3)}</span></td><td><span class="n">${(o.pay/(o.n*300)*100).toFixed(0)}%</span></td></tr>`;
+  html+=`<div class="seg">${SIG_BTS.map(x=>`<button data-btw="${x}" aria-pressed="${x===w}">最近 ${x} 期</button>`).join("")}</div>
+    <div class="scroll"><table><thead><tr><th>選法</th><th>6 中 3</th><th>平均中幾個</th><th>包牌回收率</th></tr></thead><tbody>
     ${row("第一版",t.sig)}${row("第二版",t.v2)}${row("隨機 6 個",t.rand)}
-    <tr class="theo"><td>理論值</td><td><span class="n">${(P_6IN3*100).toFixed(2)}%</span></td><td><span class="n">${(6*5/39).toFixed(3)}</span></td><td><span class="n">56%</span></td></tr></tbody></table></div>
-    <p class="note">回測 ${dateLabel(t.from)} 到 ${dateLabel(t.to)}，共 ${t.rand.n} 期${t.none||t.none2?`（沒有訊號：第一版 ${t.none} 期、第二版 ${t.none2} 期）`:""}。每組三球的「3 中 2」命中率：第一版 ${(t.sig.a32/(t.sig.n*2)*100).toFixed(2)}%、第二版 ${(t.v2.a32/(t.v2.n*2)*100).toFixed(2)}%，理論值 ${(P_3IN2*100).toFixed(2)}%。只有 150 期，樣本不大，6 中 3 差一兩次比例就會差很多。</p>
+    <tr class="theo"><td>理論值</td><td><span class="n">${(P_6IN3*t.rand.n).toFixed(1)} 次</span><small class="avg">${(P_6IN3*100).toFixed(1)}%</small></td><td><span class="n">${(6*5/39).toFixed(3)}</span></td><td><span class="n">56%</span></td></tr></tbody></table></div>
+    <p class="note">回測 ${dateLabel(t.from)} 到 ${dateLabel(t.to)}，共 ${t.rand.n} 期${t.none||t.none2?`（沒有訊號：第一版 ${t.none} 期、第二版 ${t.none2} 期）`:""}。${w<100?"只有 30 期，6 中 3 理論上平均才 0.6 次，有沒有中幾乎全看運氣。":"150 期樣本也不大，6 中 3 差一兩次比例就會差很多。"}</p>
     <h3>每組三球中幾個</h3>
-    <p class="note">把每期挑出的兩組三球分開看，各中了 0、1、2、3 個的比例。隨機三球 = 每期隨機 6 個號碼拆成兩組。</p>
-    <div class="scroll"><table><thead><tr><th>三球</th><th>中 0</th><th>中 1</th><th>中 2</th><th>中 3</th></tr></thead><tbody>
-      ${[["第一版",t.sig],["第二版",t.v2],["隨機",t.rand]].map(([nm,o])=>{ const tot=o.d3.reduce((x,y)=>x+y,0); return `<tr><td>${nm}</td>${o.d3.map(v=>`<td><span class="n">${(v/tot*100).toFixed(1)}%</span></td>`).join("")}</tr>`; }).join("")}
-      <tr class="theo"><td>理論值</td>${P_TRI.map(p=>`<td><span class="n">${(p*100).toFixed(p<0.01?2:1)}%</span></td>`).join("")}</tr></tbody></table></div>
+    <p class="note">把每期挑出的兩組三球分開看，各中了 0、1、2、3 個的次數（下方小字是比例）。隨機三球 = 每期隨機 6 個號碼拆成兩組。</p>
+    <div class="scroll"><table class="tri"><thead><tr><th>三球</th><th>中 0</th><th>中 1</th><th>中 2</th><th>中 3</th></tr></thead><tbody>
+      ${[["第一版",t.sig],["第二版",t.v2],["隨機",t.rand]].map(([nm,o])=>{ const tot=o.d3.reduce((x,y)=>x+y,0); return `<tr><td>${nm}</td>${o.d3.map(v=>`<td><span class="n">${v}</span><small class="avg">${(v/tot*100).toFixed(1)}%</small></td>`).join("")}</tr>`; }).join("")}
+      <tr class="theo"><td>理論值</td>${P_TRI.map(p=>`<td><span class="n">${(p*t.rand.n*2).toFixed(p<0.01?1:0)}</span><small class="avg">${(p*100).toFixed(p<0.01?2:1)}%</small></td>`).join("")}</tr></tbody></table></div>
     <div class="verdict">如果這個方法真的有用，「6 中 3」和「平均中幾個」應該要明顯高於隨機和理論值；如果都在附近上下跳動，就代表跟亂選一樣。回收率波動很大，只要剛好中一次貳獎（2 萬元）就會拉高很多，那是運氣不是方法。</div>
     <div class="btns"><button class="btn ghost" data-act="sigtest">重新回測</button></div></div>`;
   return html;
@@ -638,6 +640,7 @@ async function onLogin(e){
 document.addEventListener("click", async e=>{
   const g=e.target.closest("#bnav button"); if(g){ S.msg=""; go(g.dataset.g); return; }
   const tab=e.target.closest("#tabs button"); if(tab){ go(S.group, tab.dataset.t); return; }
+  const bw=e.target.closest("[data-btw]"); if(bw){ S.btWin=+bw.dataset.btw; render(); return; }
   const gb=e.target.closest("[data-go]"); if(gb){ const [g,t]=gb.dataset.go.split(":"); go(g,t); return; }
   const del=e.target.closest("[data-del]");
   if(del){ const d=del.dataset.del; if(confirm(`確定刪除 ${d} 這一期？`)) await runAdmin({action:"delete", date:d}); return; }

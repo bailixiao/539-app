@@ -243,32 +243,34 @@ function hitDist(L, nums, n){
 
 // 6 個號碼包牌（6 注、300 元）：中 k 個時，k 注中 k-1 個、6-k 注中 k 個
 const pay6 = k => k*(k>0?PRIZE[k-1]:0) + (6-k)*(k<6?PRIZE[Math.min(k,5)]:0);
-// 回測：從第 SIG_W+1 期起，每期只用之前的資料產生訊號，再對當期開獎；同時跟隨機 6 個號碼比
-// 回測最近 SIG_BT 期（每期各自用它前面 SIG_W 期分析）
-const SIG_BT = 150;
+// 回測最近 150 期，同時統計最後 30 期（每期各自只用它前面 SIG_W 期分析，再對當期開獎；跟隨機 6 個號碼比）
+const SIG_BTS = [30, 150];
+function blankBT(L, start){
+  const o=()=>({n:0,h:0,six:0,a32:0,pay:0,d3:[0,0,0,0]});
+  return {sig:o(), v2:o(), rand:o(), none:0, none2:0, from:L[start].d, to:L[L.length-1].d};
+}
+// 記一期結果：six = 6 個號碼（沒訊號為 null），tris = 兩組三球
+function addBT(o, six, tris, m){
+  const k=six.reduce((t,v)=>t+m[v],0);
+  o.n++; o.h+=k; if(k>=3) o.six++; o.pay+=pay6(k);
+  for(const g of tris){ const kk=g.reduce((t,v)=>t+m[v],0); o.d3[kk]++; if(kk>=2) o.a32++; }
+}
 // 寫成 generator：每算完一期就交回控制權，畫面可以顯示進度、不會卡住
+// 回傳 {30: 結果, 150: 結果}
 function* backtest6Steps(L){
   if(L.length < SIG_W+30) return null;
-  const start=Math.max(SIG_W, L.length-SIG_BT);
-  const r=rng(6363), res={sig:{n:0,h:0,six:0,a32:0,pay:0,d3:[0,0,0,0]}, v2:{n:0,h:0,six:0,a32:0,pay:0,d3:[0,0,0,0]}, rand:{n:0,h:0,six:0,pay:0,d3:[0,0,0,0]}, none:0, none2:0, from:L[start].d, to:L[L.length-1].d};
+  const big=Math.max(...SIG_BTS), start=Math.max(SIG_W, L.length-big), r=rng(6363), res={};
+  for(const w of SIG_BTS) res[w]=blankBT(L, Math.max(SIG_W, L.length-w));
   for(let i=start;i<L.length;i++){
     yield (i-start)/(L.length-start);
-    const s2=signalAtV2(L,i);
-    if(s2){
-      const m2=mset(L[i]), k2=s2.six.reduce((t,v)=>t+m2[v],0);
-      res.v2.n++; res.v2.h+=k2; if(k2>=3) res.v2.six++; res.v2.pay+=pay6(k2);
-      for(const g of [s2.a.t, s2.b.t]){ const k=g.reduce((t,v)=>t+m2[v],0); res.v2.d3[k]++; if(k>=2) res.v2.a32++; }
-    } else res.none2++;
-    const m=mset(L[i]);
+    const m=mset(L[i]), ws=SIG_BTS.filter(w=>i>=L.length-w).map(w=>res[w]);
     const rp=[]; while(rp.length<6){ const v=1+Math.floor(r()*39); if(!rp.includes(v)) rp.push(v); }
-    const kr=rp.reduce((s,v)=>s+m[v],0);
-    res.rand.n++; res.rand.h+=kr; if(kr>=3) res.rand.six++; res.rand.pay+=pay6(kr);
-    for(const g of [rp.slice(0,3), rp.slice(3)]) res.rand.d3[g.reduce((t,v)=>t+m[v],0)]++;
-    const s=signalAt(L,i);
-    if(!s){ res.none++; continue; }
-    const k=s.six.reduce((t,v)=>t+m[v],0);
-    res.sig.n++; res.sig.h+=k; if(k>=3) res.sig.six++; res.sig.pay+=pay6(k);
-    for(const g of [s.a.t, s.b.t]){ const k=g.reduce((t,v)=>t+m[v],0); res.sig.d3[k]++; if(k>=2) res.sig.a32++; }
+    const s=signalAt(L,i), s2=signalAtV2(L,i);
+    for(const o of ws){
+      addBT(o.rand, rp, [rp.slice(0,3), rp.slice(3)], m);
+      if(s) addBT(o.sig, s.six, [s.a.t, s.b.t], m); else o.none++;
+      if(s2) addBT(o.v2, s2.six, [s2.a.t, s2.b.t], m); else o.none2++;
+    }
   }
   return res;
 }
